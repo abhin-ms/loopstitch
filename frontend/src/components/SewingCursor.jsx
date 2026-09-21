@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * SewingCursor v2 – Elegant embroidery thread trail
@@ -9,8 +9,13 @@ import { useEffect, useRef, useCallback } from 'react'
  * - Thin gradient thread that fades gracefully
  * - Minimal needle tip
  * - Respects prefers-reduced-motion
+ * - Skipped entirely on touch devices (see TouchFeedback for the touch-native version)
+ * - Draw loop sleeps once the trail has faded, so an idle page costs nothing
  */
+const TOUCH_QUERY = '(hover: none), (pointer: coarse)'
+
 export default function SewingCursor() {
+  const [isTouch] = useState(() => typeof window !== 'undefined' && window.matchMedia(TOUCH_QUERY).matches)
   const canvasRef = useRef(null)
   const state = useRef({
     mouse: { x: -200, y: -200 },
@@ -48,17 +53,8 @@ export default function SewingCursor() {
     }
   }
 
-  const handleMouseMove = useCallback((e) => {
-    state.current.mouse = { x: e.clientX, y: e.clientY }
-    state.current.active = true
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    state.current.active = false
-  }, [])
-
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (isTouch || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     const canvas = canvasRef.current
     if (!canvas) return
@@ -76,10 +72,23 @@ export default function SewingCursor() {
     resize()
 
     window.addEventListener('resize', resize)
-    window.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseleave', handleMouseLeave)
 
     let lastStitchDist = 0
+    let lastMoveAt = 0
+    let running = false
+
+    const handleMouseMove = (e) => {
+      state.current.mouse = { x: e.clientX, y: e.clientY }
+      state.current.active = true
+      lastMoveAt = Date.now()
+      if (!running) {
+        running = true
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+    const handleMouseLeave = () => {
+      state.current.active = false
+    }
 
     const tick = () => {
       const s = state.current
@@ -223,10 +232,17 @@ export default function SewingCursor() {
         ctx.stroke()
       }
 
+      // Sleep once the mouse has stopped and everything has faded; a move wakes it again
+      if (now - lastMoveAt > 500 && s.trail.length === 0 && s.stitchPoints.length === 0) {
+        running = false
+        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr)
+        return
+      }
       rafRef.current = requestAnimationFrame(tick)
     }
 
-    rafRef.current = requestAnimationFrame(tick)
+    window.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseleave', handleMouseLeave)
 
     return () => {
       cancelAnimationFrame(rafRef.current)
@@ -234,7 +250,9 @@ export default function SewingCursor() {
       window.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseleave', handleMouseLeave)
     }
-  }, [handleMouseMove, handleMouseLeave])
+  }, [isTouch])
+
+  if (isTouch) return null
 
   return (
     <canvas
@@ -244,8 +262,8 @@ export default function SewingCursor() {
         position: 'fixed',
         top: 0,
         left: 0,
-        width: '100vw',
-        height: '100vh',
+        width: '100%',
+        height: '100%',
         pointerEvents: 'none',
         zIndex: 9999,
       }}

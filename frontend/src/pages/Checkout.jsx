@@ -44,6 +44,16 @@ export default function Checkout() {
   const [codAdvancePercent, setCodAdvancePercent] = useState(10)
   const [razorpayKeyId, setRazorpayKeyId] = useState('')
 
+  // Razorpay's script is only needed here, so load it on demand instead of on every page
+  useEffect(() => {
+    if (window.Razorpay || document.querySelector('script[data-razorpay]')) return
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.dataset.razorpay = 'true'
+    document.body.appendChild(script)
+  }, [])
+
   // Load checkout settings
   useEffect(() => {
     client.get('/api/settings/checkout').then((res) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import client, { mediaUrl } from '../api/client'
@@ -6,6 +6,11 @@ import { useCart } from '../context/CartContext'
 import { formatINR } from '../utils/format'
 import SizePicker from '../components/SizePicker'
 import Loader from '../components/Loader'
+import SizeGuide from '../components/SizeGuide'
+import ProductReviews from '../components/ProductReviews'
+import StarRating from '../components/StarRating'
+import { useWishlist } from '../context/WishlistContext'
+import { haptic } from '../utils/haptics'
 
 export default function ProductDetail() {
   const { slug } = useParams()
@@ -20,7 +25,13 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [justAdded, setJustAdded] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [rating, setRating] = useState({ average: 0, count: 0 })
+  const [zoom, setZoom] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const wishlist = useWishlist()
   const timeoutRef = useRef(null)
+  const handleSummary = useCallback((summary) => setRating({ average: summary.average, count: summary.count }), [])
 
   useEffect(() => {
     setLoading(true)
@@ -63,11 +74,13 @@ export default function ProductDetail() {
     schema.textContent = JSON.stringify({
       '@context': 'https://schema.org', '@type': 'Product', name: product.name,
       description, image: (product.colors?.[0]?.images || product.images || []).map((image) => mediaUrl(image.url)),
-      sku: product.slug, offers: { '@type': 'Offer', priceCurrency: 'INR', price: product.price, availability: product.total_stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: window.location.href },
+      sku: product.slug,
+      ...(rating.count > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: rating.average, reviewCount: rating.count } } : {}),
+      offers: { '@type': 'Offer', priceCurrency: 'INR', price: product.price, availability: product.total_stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: window.location.href },
     })
     document.head.appendChild(schema)
     return () => { elements.forEach((el) => el.remove()); schema.remove() }
-  }, [product])
+  }, [product, rating])
 
   useEffect(() => {
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }
@@ -94,6 +107,7 @@ export default function ProductDetail() {
   const handleAdd = () => {
     if (!selectedSize || maxForSize < 1) return
     addItem(product, selectedColor, selectedSize, quantity, maxForSize)
+    haptic(20)
     setJustAdded(true)
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => setJustAdded(false), 1800)
@@ -108,7 +122,11 @@ export default function ProductDetail() {
       <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
         {/* Gallery */}
         <div>
-          <div className="relative aspect-[4/5] bg-panel overflow-hidden mb-3">
+          <div
+            className="relative aspect-[4/5] bg-panel overflow-hidden mb-3 cursor-zoom-in"
+            onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setZoom({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 }) }}
+            onMouseLeave={() => setZoom(null)}
+          >
             <AnimatePresence mode="wait">
               {images.length > 0 ? (
                 <motion.img
@@ -119,7 +137,20 @@ export default function ProductDetail() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.25 }}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover "
+                  style={{ scale: zoom ? 1.8 : 1, originX: zoom ? zoom.x / 100 : 0.5, originY: zoom ? zoom.y / 100 : 0.5 }}
+                  drag={images.length > 1 ? 'x' : false}
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.25}
+                  dragSnapToOrigin
+                  onDragEnd={(_, info) => {
+                    if (Math.abs(info.offset.x) < 60 && Math.abs(info.velocity.x) < 400) return
+                    haptic(8)
+                    setActiveImage((i) => (info.offset.x < 0 ? Math.min(images.length - 1, i + 1) : Math.max(0, i - 1)))
+                  }}
+                  fetchPriority="high"
+                  width="800"
+                  height="1000"
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-slate-dim font-mono text-xs">NO IMAGE</div>
@@ -153,6 +184,12 @@ export default function ProductDetail() {
           )}
           {colors.length === 1 && product.colorway && <p className="font-mono text-xs text-slate uppercase tracking-widest mb-2">{product.colorway}</p>}
           <h1 className="font-display text-3xl sm:text-4xl uppercase text-paper leading-tight mb-3">{product.name}</h1>
+          {rating.count > 0 && (
+            <a href="#reviews-title" className="flex items-center gap-2 mb-3 w-fit">
+              <StarRating value={rating.average} />
+              <span className="font-mono text-xs text-slate">{rating.average} · {rating.count} review{rating.count > 1 ? 's' : ''}</span>
+            </a>
+          )}
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-xl text-paper">{formatINR(product.price)}</span>
             {product.compare_at_price > 0 && (
@@ -166,7 +203,7 @@ export default function ProductDetail() {
 
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-mono text-xs uppercase tracking-widest text-slate">Size</span>
+              <span className="font-mono text-xs uppercase tracking-widest text-slate">Size · <button type="button" onClick={() => setGuideOpen(true)} className="underline underline-offset-4 hover:text-acid py-2">Size guide</button></span>
               {selectedSize && (
                 <span className="font-mono text-xs text-slate">
                   {maxForSize > 0 ? `${maxForSize} in stock` : 'Locked — sold out'}
@@ -213,6 +250,23 @@ export default function ProductDetail() {
             {!selectedSize ? 'Select a size' : maxForSize < 1 ? 'Locked — sold out' : justAdded ? 'Added ✓' : 'Add to cart'}
           </button>
 
+          <div className="flex gap-3 mt-4">
+            <button type="button" onClick={() => wishlist.toggle(product.id)} aria-pressed={wishlist.has(product.id)} className="border border-panel-2 px-4 py-3 font-mono text-xs uppercase tracking-widest text-slate hover:text-riot hover:border-riot transition-colors">
+              {wishlist.has(product.id) ? '♥ Saved' : '♡ Save'}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const data = { title: product.name, url: window.location.href }
+                if (navigator.share) { try { await navigator.share(data) } catch { /* dismissed */ } return }
+                try { await navigator.clipboard.writeText(data.url); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* clipboard blocked */ }
+              }}
+              className="border border-panel-2 px-4 py-3 font-mono text-xs uppercase tracking-widest text-slate hover:text-acid hover:border-acid transition-colors"
+            >
+              {copied ? 'Link copied' : 'Share'}
+            </button>
+          </div>
+
           <div className="mt-10 pt-6 border-t border-panel-2 text-xs text-slate space-y-1.5 font-mono">
             <p>· DTF print, 240 GSM heavyweight cotton</p>
             <p>· Ships in 3–5 business days from Calicut, Kerala</p>
@@ -220,6 +274,22 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      <ProductReviews slug={product.slug} onSummary={handleSummary} />
+      <SizeGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
+
+      {/* Sticky mobile add-to-cart */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-ink/95 backdrop-blur border-t border-panel-2 px-5 py-3 flex items-center gap-4">
+        <span className="font-mono text-paper">{formatINR(product.price)}</span>
+        <button
+          onClick={handleAdd}
+          disabled={!selectedSize || maxForSize < 1}
+          className={`flex-1 py-3.5 font-mono text-xs uppercase tracking-widest ${!selectedSize || maxForSize < 1 ? 'bg-panel-2 text-slate-dim' : justAdded ? 'bg-acid text-ink' : 'bg-riot text-ink'}`}
+        >
+          {!selectedSize ? 'Select a size' : maxForSize < 1 ? 'Sold out' : justAdded ? 'Added ✓' : 'Add to cart'}
+        </button>
+      </div>
+      <div className="md:hidden h-16" aria-hidden="true" />
     </div>
   )
 }

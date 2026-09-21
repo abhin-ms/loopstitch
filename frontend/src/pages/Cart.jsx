@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from '../context/CartContext'
@@ -14,6 +14,11 @@ export default function Cart() {
   const [couponError, setCouponError] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const quote = useQuote(items, couponApplied?.code || '')
+  const [freeShipAt, setFreeShipAt] = useState(0)
+
+  useEffect(() => {
+    client.get('/api/settings/shipping').then((res) => setFreeShipAt(res.data.free_shipping_threshold || 0)).catch(() => {})
+  }, [])
 
   if (items.length === 0) {
     return (
@@ -59,6 +64,17 @@ export default function Cart() {
   return (
     <div className="max-w-5xl mx-auto px-5 sm:px-8 py-14 sm:py-20">
       <h1 className="font-display text-3xl sm:text-4xl uppercase text-paper mb-8 sm:mb-10">Your cart</h1>
+
+      {freeShipAt > 0 && (
+        <div className="mb-8 border border-panel-2 p-4" role="status">
+          <p className="font-mono text-xs text-paper mb-2">
+            {subtotal >= freeShipAt ? '✓ You\'ve unlocked free shipping' : `Add ${formatINR(freeShipAt - subtotal)} more for free shipping`}
+          </p>
+          <div className="h-1.5 bg-panel-2" aria-hidden="true">
+            <div className="h-full bg-acid transition-all duration-500" style={{ width: `${Math.min(100, (subtotal / freeShipAt) * 100)}%` }} />
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-10">
         <div className="md:col-span-2 space-y-1">

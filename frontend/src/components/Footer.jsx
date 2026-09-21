@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Logo from './Logo'
 
 export default function Footer() {
   return (
@@ -6,7 +7,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10 sm:py-14 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10">
         <div>
           <div className="mb-3">
-            <img src="/preview.webp" alt="Loopstitch" className="h-10 w-auto object-contain" />
+            <Logo />
           </div>
           <p className="text-sm text-slate leading-relaxed max-w-xs">
             Limited anime drops and custom prints on premium tees, made in Calicut, Kerala.

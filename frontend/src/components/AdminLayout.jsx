@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import Loader from './Loader'
 import { useAdminAuth } from '../context/AdminAuthContext'
 
 const LINKS = [
@@ -7,9 +9,13 @@ const LINKS = [
   { to: '/admin/products', label: 'Products' },
   { to: '/admin/custom-tshirt', label: 'Custom T-Shirt' },
   { to: '/admin/custom-orders', label: 'Custom Orders' },
+  { to: '/admin/announcements', label: 'Announcements' },
   { to: '/admin/offers', label: 'Offers' },
   { to: '/admin/coupons', label: 'Coupons' },
   { to: '/admin/orders', label: 'Orders' },
+  { to: '/admin/instagram', label: 'Instagram' },
+  { to: '/admin/reviews', label: 'Reviews' },
+  { to: '/admin/subscribers', label: 'Subscribers' },
   { to: '/admin/notifications', label: 'Notifications' },
   { to: '/admin/settings', label: 'Settings' },
 ]
@@ -122,7 +128,9 @@ export default function AdminLayout() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0 lg:ml-60 pt-14 lg:pt-0 px-4 sm:px-8 lg:px-10 py-6 lg:py-10">
-        <Outlet />
+        <Suspense fallback={<Loader label="Loading" />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

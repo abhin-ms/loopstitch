@@ -1707,3 +1707,236 @@ def admin_get_custom_order(
     ).all()
     out = schemas.OrderOut.model_validate(order)
     return {"order": out, "designs": [schemas.CustomDesignOut.model_validate(d) for d in designs]}
+
+
+# ============================================================
+# SUBSCRIBERS (notify me about the next drop)
+# ============================================================
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@app.post("/api/subscribe")
+def subscribe(payload: schemas.SubscribeIn, db: Session = Depends(get_db)):
+    contact = payload.contact.strip().lower()
+    if _EMAIL_RE.match(contact):
+        kind = "email"
+    else:
+        digits = re.sub(r"\D", "", contact)
+        if len(digits) < 10 or len(digits) > 13:
+            raise HTTPException(status_code=422, detail="Enter a valid email or phone number.")
+        contact, kind = digits[-10:], "phone"
+    if not db.query(models.Subscriber).filter(models.Subscriber.contact == contact).first():
+        db.add(models.Subscriber(contact=contact, kind=kind, source=payload.source))
+        db.commit()
+    return {"detail": "You're on the list."}
+
+
+@app.get("/api/admin/subscribers")
+def admin_list_subscribers(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    rows = db.query(models.Subscriber).order_by(models.Subscriber.created_at.desc()).all()
+    return [{"id": r.id, "contact": r.contact, "kind": r.kind, "source": r.source, "created_at": r.created_at} for r in rows]
+
+
+# ============================================================
+# REVIEWS (public submit -> admin approves)
+# ============================================================
+@app.get("/api/products/{slug}/reviews", response_model=schemas.ReviewSummary)
+def product_reviews(slug: str, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.slug == slug).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    reviews = (
+        db.query(models.Review)
+        .filter(models.Review.product_id == product.id, models.Review.is_approved == True)  # noqa: E712
+        .order_by(models.Review.created_at.desc())
+        .all()
+    )
+    avg = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0.0
+    return schemas.ReviewSummary(average=avg, count=len(reviews), reviews=reviews)
+
+
+@app.get("/api/reviews/featured", response_model=List[schemas.ReviewOut])
+def featured_reviews(db: Session = Depends(get_db)):
+    return (
+        db.query(models.Review)
+        .filter(models.Review.is_approved == True, models.Review.rating >= 4)  # noqa: E712
+        .order_by(models.Review.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
+
+@app.post("/api/products/{slug}/reviews")
+def submit_review(slug: str, payload: schemas.ReviewIn, db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.slug == slug).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db.add(models.Review(
+        product_id=product.id, name=payload.name.strip(), rating=payload.rating,
+        title=payload.title.strip(), body=payload.body.strip(), is_approved=False,
+    ))
+    db.commit()
+    return {"detail": "Thanks! Your review will appear once it has been approved."}
+
+
+@app.get("/api/admin/reviews", response_model=List[schemas.ReviewOut])
+def admin_list_reviews(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    return db.query(models.Review).order_by(models.Review.created_at.desc()).all()
+
+
+@app.patch("/api/admin/reviews/{review_id}/toggle", response_model=schemas.ReviewOut)
+def admin_toggle_review(review_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    review.is_approved = not review.is_approved
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@app.delete("/api/admin/reviews/{review_id}")
+def admin_delete_review(review_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    db.delete(review)
+    db.commit()
+    return {"detail": "Review deleted"}
+
+
+# ============================================================
+# ANNOUNCEMENTS (offer highlights managed from the admin)
+# ============================================================
+def _to_naive_utc(value: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
+
+def _apply_announcement(row: models.Announcement, payload: schemas.AnnouncementIn) -> None:
+    row.message = payload.message.strip()
+    row.detail = payload.detail.strip()
+    row.coupon_code = payload.coupon_code.strip().upper()
+    link = payload.link_url.strip()
+    # only same-site paths or https links, never javascript: URLs
+    row.link_url = link if link.startswith("/") or link.startswith("https://") else ""
+    row.link_label = payload.link_label.strip()
+    row.style = payload.style
+    row.placement = payload.placement
+    row.is_active = payload.is_active
+    row.starts_at = _to_naive_utc(payload.starts_at)
+    row.ends_at = _to_naive_utc(payload.ends_at)
+
+
+@app.get("/api/announcements", response_model=List[schemas.AnnouncementOut])
+def public_announcements(db: Session = Depends(get_db)):
+    now = _utcnow()
+    rows = db.query(models.Announcement).filter(models.Announcement.is_active == True).order_by(models.Announcement.created_at.desc()).all()  # noqa: E712
+    return [r for r in rows if (r.starts_at is None or r.starts_at <= now) and (r.ends_at is None or r.ends_at >= now)]
+
+
+@app.get("/api/admin/announcements", response_model=List[schemas.AnnouncementOut])
+def admin_list_announcements(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    return db.query(models.Announcement).order_by(models.Announcement.created_at.desc()).all()
+
+
+@app.post("/api/admin/announcements", response_model=schemas.AnnouncementOut)
+def admin_create_announcement(payload: schemas.AnnouncementIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = models.Announcement(created_at=_utcnow())
+    _apply_announcement(row, payload)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.put("/api/admin/announcements/{announcement_id}", response_model=schemas.AnnouncementOut)
+def admin_update_announcement(announcement_id: int, payload: schemas.AnnouncementIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    _apply_announcement(row, payload)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.patch("/api/admin/announcements/{announcement_id}/toggle", response_model=schemas.AnnouncementOut)
+def admin_toggle_announcement(announcement_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    row.is_active = not row.is_active
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/api/admin/announcements/{announcement_id}")
+def admin_delete_announcement(announcement_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    db.delete(row)
+    db.commit()
+    return {"detail": "Announcement deleted"}
+
+
+# ============================================================
+# INSTAGRAM POSTS (admin pastes a public post/reel link; storefront embeds it)
+# ============================================================
+_IG_RE = re.compile(r"instagram\.com/(?:[A-Za-z0-9_.]+/)?(p|reels?|tv)/([A-Za-z0-9_-]{5,20})", re.IGNORECASE)
+
+
+@app.get("/api/instagram", response_model=List[schemas.InstagramPostOut])
+def public_instagram_posts(db: Session = Depends(get_db)):
+    return (
+        db.query(models.InstagramPost)
+        .filter(models.InstagramPost.is_active == True)  # noqa: E712
+        .order_by(models.InstagramPost.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
+
+@app.get("/api/admin/instagram", response_model=List[schemas.InstagramPostOut])
+def admin_list_instagram(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    return db.query(models.InstagramPost).order_by(models.InstagramPost.created_at.desc()).all()
+
+
+@app.post("/api/admin/instagram", response_model=schemas.InstagramPostOut)
+def admin_add_instagram(payload: schemas.InstagramPostIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    match = _IG_RE.search(payload.url.strip())
+    if not match:
+        raise HTTPException(status_code=422, detail="That doesn't look like an Instagram post or reel link.")
+    kind = "reel" if match.group(1).lower().startswith("reel") else match.group(1).lower()
+    code = match.group(2)
+    if db.query(models.InstagramPost).filter(models.InstagramPost.shortcode == code).first():
+        raise HTTPException(status_code=409, detail="That post is already added.")
+    row = models.InstagramPost(kind=kind, shortcode=code, created_at=_utcnow())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.patch("/api/admin/instagram/{post_id}/toggle", response_model=schemas.InstagramPostOut)
+def admin_toggle_instagram(post_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.InstagramPost).filter(models.InstagramPost.id == post_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Post not found")
+    row.is_active = not row.is_active
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/api/admin/instagram/{post_id}")
+def admin_delete_instagram(post_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.InstagramPost).filter(models.InstagramPost.id == post_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Post not found")
+    db.delete(row)
+    db.commit()
+    return {"detail": "Post removed"}

@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext'
 import { useTheme } from '../context/ThemeContext'
 import { useCustomerAuth } from '../context/CustomerAuthContext'
 import LoginModal from './LoginModal'
+import Logo from './Logo'
 
 const NAV_LINKS = [
   { to: '/shop', label: 'Shop' },
@@ -46,7 +47,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-40 bg-ink/90 backdrop-blur border-b border-panel-2">
         <nav className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center" onClick={() => setOpen(false)}>
-            <img src="/preview.webp" alt="Loopstitch" className="h-10 w-auto object-contain" />
+            <Logo />
           </Link>
 
           <div className="hidden md:flex items-center gap-8">

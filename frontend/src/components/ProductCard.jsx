@@ -2,8 +2,12 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { mediaUrl } from '../api/client'
 import { formatINR } from '../utils/format'
+import { useWishlist } from '../context/WishlistContext'
+import { haptic } from '../utils/haptics'
 
 export default function ProductCard({ product, index = 0 }) {
+  const wishlist = useWishlist()
+  const wished = wishlist.has(product.id)
   const primaryImage = product.images?.[0]?.url
   const secondaryImage = product.images?.[1]?.url
   const totalStock = product.total_stock ?? 0
@@ -25,6 +29,9 @@ export default function ProductCard({ product, index = 0 }) {
               alt={product.name}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 group-hover:opacity-0"
               loading="lazy"
+              decoding="async"
+              width="800"
+              height="1000"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-slate-dim font-mono text-xs">NO IMAGE</div>
@@ -37,6 +44,17 @@ export default function ProductCard({ product, index = 0 }) {
               loading="lazy"
             />
           )}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); wishlist.toggle(product.id); haptic(10) }}
+            aria-label={wished ? `Remove ${product.name} from wishlist` : `Save ${product.name} to wishlist`}
+            aria-pressed={wished}
+            className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center z-10"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={wished ? 'var(--color-riot)' : 'rgba(0,0,0,0.25)'} stroke={wished ? 'var(--color-riot)' : '#fff'} strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s-7.5-4.6-9.5-9.2C1 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7h2C14 6.1 15.600 5 17.600 5 21 5 23 8.400 21.500 11.800 19.500 16.400 12 21 12 21z" />
+            </svg>
+          </button>
           <div className="absolute inset-0 screentone-red screentone opacity-0 group-hover:opacity-[0.08] transition-opacity duration-500" />
 
           {product.is_featured && !isSoldOut && (

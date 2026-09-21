@@ -1,38 +1,45 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { CartProvider } from './context/CartContext'
 import { AdminAuthProvider } from './context/AdminAuthContext'
 import { CustomerAuthProvider } from './context/CustomerAuthContext'
+import { WishlistProvider } from './context/WishlistContext'
+import Loader from './components/Loader'
 
 import PublicLayout from './components/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import ScrollToTop from './components/ScrollToTop'
 
-import Home from './pages/Home'
-import Shop from './pages/Shop'
-import ProductDetail from './pages/ProductDetail'
-import Cart from './pages/Cart'
-import Checkout from './pages/Checkout'
-import OrderConfirmation from './pages/OrderConfirmation'
-import OrderHistory from './pages/OrderHistory'
-import Customize from './pages/Customize'
-import About from './pages/About'
-import Terms from './pages/Terms'
-import Privacy from './pages/Privacy'
-import NotFound from './pages/NotFound'
+const Home = lazy(() => import('./pages/Home'))
+const Shop = lazy(() => import('./pages/Shop'))
+const ProductDetail = lazy(() => import('./pages/ProductDetail'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Checkout = lazy(() => import('./pages/Checkout'))
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
+const OrderHistory = lazy(() => import('./pages/OrderHistory'))
+const Customize = lazy(() => import('./pages/Customize'))
+const About = lazy(() => import('./pages/About'))
+const Terms = lazy(() => import('./pages/Terms'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
-import AdminLogin from './pages/admin/AdminLogin'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminProducts from './pages/admin/AdminProducts'
-import AdminProductForm from './pages/admin/AdminProductForm'
-import AdminOffers from './pages/admin/AdminOffers'
-import AdminOfferForm from './pages/admin/AdminOfferForm'
-import AdminCoupons from './pages/admin/AdminCoupons'
-import AdminCouponForm from './pages/admin/AdminCouponForm'
-import AdminSettings from './pages/admin/AdminSettings'
-import AdminOrders from './pages/admin/AdminOrders'
-import AdminNotifications from './pages/admin/AdminNotifications'
-import AdminCustomTshirt from './pages/admin/AdminCustomTshirt'
-import AdminCustomOrders from './pages/admin/AdminCustomOrders'
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
+const AdminProductForm = lazy(() => import('./pages/admin/AdminProductForm'))
+const AdminOffers = lazy(() => import('./pages/admin/AdminOffers'))
+const AdminOfferForm = lazy(() => import('./pages/admin/AdminOfferForm'))
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
+const AdminCouponForm = lazy(() => import('./pages/admin/AdminCouponForm'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
+const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'))
+const AdminCustomTshirt = lazy(() => import('./pages/admin/AdminCustomTshirt'))
+const AdminCustomOrders = lazy(() => import('./pages/admin/AdminCustomOrders'))
+const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'))
+const AdminInstagram = lazy(() => import('./pages/admin/AdminInstagram'))
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
+const AdminSubscribers = lazy(() => import('./pages/admin/AdminSubscribers'))
 
 export default function App() {
   return (
@@ -40,7 +47,9 @@ export default function App() {
       <AdminAuthProvider>
         <CustomerAuthProvider>
           <CartProvider>
+            <WishlistProvider>
             <ScrollToTop />
+            <Suspense fallback={<Loader label="Loading" />}>
             <Routes>
               {/* Public storefront */}
               <Route element={<PublicLayout />}>
@@ -77,9 +86,15 @@ export default function App() {
                 <Route path="custom-tshirt" element={<AdminCustomTshirt />} />
                 <Route path="custom-orders" element={<AdminCustomOrders />} />
                 <Route path="notifications" element={<AdminNotifications />} />
+                <Route path="announcements" element={<AdminAnnouncements />} />
+                <Route path="instagram" element={<AdminInstagram />} />
+                <Route path="reviews" element={<AdminReviews />} />
+                <Route path="subscribers" element={<AdminSubscribers />} />
                 <Route path="*" element={<Navigate to="dashboard" replace />} />
               </Route>
             </Routes>
+            </Suspense>
+            </WishlistProvider>
           </CartProvider>
         </CustomerAuthProvider>
       </AdminAuthProvider>

@@ -552,3 +552,82 @@ class CustomQuoteOut(BaseModel):
     discount_amount: float = 0
     shipping_fee: float
     total: float
+
+
+# ---------- Subscribers & Reviews ----------
+class SubscribeIn(BaseModel):
+    contact: str = Field(min_length=5, max_length=150)
+    source: str = Field(default="home", max_length=50)
+
+
+class ReviewIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    rating: int = Field(ge=1, le=5)
+    title: str = Field(default="", max_length=150)
+    body: str = Field(default="", max_length=2000)
+
+
+class ReviewOut(BaseModel):
+    id: int
+    product_id: int
+    name: str
+    rating: int
+    title: str
+    body: str
+    is_approved: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReviewSummary(BaseModel):
+    average: float
+    count: int
+    reviews: List[ReviewOut]
+
+
+# ---------- Announcements ----------
+class AnnouncementIn(BaseModel):
+    message: str = Field(min_length=1, max_length=200)
+    detail: str = Field(default="", max_length=300)
+    coupon_code: str = Field(default="", max_length=50)
+    link_url: str = Field(default="", max_length=300)
+    link_label: str = Field(default="", max_length=50)
+    style: str = Field(default="acid", pattern="^(acid|riot|ink)$")
+    placement: str = Field(default="bar", pattern="^(bar|banner|both)$")
+    is_active: bool = True
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+
+
+class AnnouncementOut(BaseModel):
+    id: int
+    message: str
+    detail: str
+    coupon_code: str
+    link_url: str
+    link_label: str
+    style: str
+    placement: str
+    is_active: bool
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Instagram posts ----------
+class InstagramPostIn(BaseModel):
+    url: str = Field(min_length=10, max_length=300)
+
+
+class InstagramPostOut(BaseModel):
+    id: int
+    kind: str
+    shortcode: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True

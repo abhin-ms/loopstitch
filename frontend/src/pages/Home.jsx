@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import client from '../api/client'
+import client, { mediaUrl } from '../api/client'
 import ProductCard from '../components/ProductCard'
-import Loader from '../components/Loader'
+import ProductSkeleton from '../components/ProductSkeleton'
+import TrustStrip from '../components/TrustStrip'
+import NewsletterForm from '../components/NewsletterForm'
+import StarRating from '../components/StarRating'
+import OfferBanner from '../components/OfferBanner'
+import InstagramSection from '../components/InstagramSection'
 
 const reveal = {
   hidden: { opacity: 0, y: 18 },
@@ -13,6 +18,7 @@ const reveal = {
 export default function Home() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [reviews, setReviews] = useState([])
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
@@ -28,11 +34,21 @@ export default function Home() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    client.get('/api/reviews/featured').then((res) => setReviews(res.data)).catch(() => {})
+  }, [])
+
+  const heroImages = products
+    .map((p) => (p.colors?.[0]?.images?.[0] || p.images?.[0])?.url)
+    .filter(Boolean)
+    .slice(0, 3)
+
   return (
     <div>
-      <section className="relative overflow-hidden border-b border-panel-2">
+      <section className="relative overflow-hidden">
         <div className="absolute inset-0 screentone" />
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-24 lg:py-28 relative">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-20 lg:py-24 relative grid lg:grid-cols-[1.25fr_1fr] gap-12 items-center">
+          <div>
           <motion.p
             initial={reduceMotion ? false : 'hidden'} animate="visible" variants={reveal}
             transition={{ duration: 0.45 }}
@@ -73,8 +89,32 @@ export default function Home() {
               <span className="block mt-2 text-xs text-slate group-hover:text-acid/80">Your design · your tee →</span>
             </Link>
           </motion.div>
+          </div>
+
+          {heroImages.length > 0 && (
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
+              className="relative hidden lg:block h-[34rem]" aria-hidden="true"
+            >
+              {heroImages.map((url, i) => (
+                <div
+                  key={url}
+                  className="absolute w-[58%] aspect-[4/5] overflow-hidden border border-panel-2 shadow-2xl bg-panel"
+                  style={{ top: `${i * 9}%`, left: `${i * 21}%`, transform: `rotate(${(i - 1) * 4}deg)`, zIndex: i }}
+                >
+                  <img src={mediaUrl(url)} alt="" className="w-full h-full object-cover" fetchPriority={i === 0 ? 'high' : undefined} decoding="async" />
+                </div>
+              ))}
+              <span className="sticker absolute -bottom-2 right-2 z-10 bg-acid text-ink font-mono text-[11px] font-bold px-3 py-1.5 uppercase tracking-wider">
+                Drop 001 · Live
+              </span>
+            </motion.div>
+          )}
         </div>
       </section>
+
+      <TrustStrip />
+      <OfferBanner />
 
       <section className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
         <motion.div
@@ -93,7 +133,7 @@ export default function Home() {
         </motion.div>
 
         {loading ? (
-          <Loader label="Fetching drops" />
+          <ProductSkeleton count={4} />
         ) : products.length === 0 ? (
           <div className="text-center py-20 text-slate font-mono text-sm">
             No products yet — add some from the admin dashboard.
@@ -155,16 +195,32 @@ export default function Home() {
         </div>
       </section>
 
+      <InstagramSection />
+
+      {reviews.length > 0 && (
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24" aria-labelledby="home-reviews">
+          <p className="font-mono text-xs text-riot tracking-widest uppercase mb-2">On the streets</p>
+          <h2 id="home-reviews" className="font-display text-3xl sm:text-5xl uppercase text-paper mb-8">What wearers say</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            {reviews.slice(0, 3).map((r) => (
+              <figure key={r.id} className="border border-panel-2 p-5">
+                <StarRating value={r.rating} />
+                <blockquote className="text-sm text-paper/80 leading-relaxed mt-3">{r.body || r.title}</blockquote>
+                <figcaption className="font-mono text-[11px] text-slate mt-3 uppercase tracking-wider">{r.name}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="max-w-7xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
-        <div className="border border-panel-2 p-6 sm:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="border border-panel-2 p-6 sm:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div>
             <p className="font-mono text-xs text-acid tracking-widest uppercase mb-2">For the next drop</p>
             <h2 className="font-display text-3xl sm:text-4xl uppercase text-paper">Get notified before it goes live.</h2>
             <p className="text-sm text-slate mt-2">No spam — just a heads-up before the next limited run.</p>
           </div>
-          <a href="mailto:hello@loopstitch.online?subject=Notify me about the next drop" className="shrink-0 border border-riot text-riot font-mono text-xs uppercase tracking-widest px-6 py-3.5 hover:bg-riot hover:text-ink transition-colors">
-            Notify me
-          </a>
+          <NewsletterForm source="home" />
         </div>
       </section>
     </div>

@@ -332,3 +332,59 @@ class CustomTshirtDesign(Base):
     created_at = Column(DateTime, default=_utcnow)
 
     order = relationship("Order", back_populates="custom_designs")
+
+
+class Subscriber(Base):
+    """Email / WhatsApp sign-up for "notify me about the next drop"."""
+    __tablename__ = "subscribers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact = Column(String(150), unique=True, index=True, nullable=False)  # email or phone
+    kind = Column(String(20), default="email")  # email / phone
+    source = Column(String(50), default="home")
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class Review(Base):
+    """Customer product review. Hidden from the storefront until an admin approves it."""
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    rating = Column(Integer, nullable=False)
+    title = Column(String(150), default="")
+    body = Column(Text, default="")
+    is_approved = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+    product = relationship("Product")
+
+
+class Announcement(Base):
+    """Admin-managed offer / news message shown on the storefront (top bar and/or home banner)."""
+    __tablename__ = "announcements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message = Column(String(200), nullable=False)
+    detail = Column(String(300), default="")        # optional second line for the big home banner
+    coupon_code = Column(String(50), default="")    # optional; shown as tap-to-copy
+    link_url = Column(String(300), default="")      # optional, e.g. /shop or /customize
+    link_label = Column(String(50), default="")
+    style = Column(String(20), default="acid")      # acid / riot / ink
+    placement = Column(String(20), default="bar")   # bar / banner / both
+    is_active = Column(Boolean, default=True, index=True)
+    starts_at = Column(DateTime, nullable=True)
+    ends_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class InstagramPost(Base):
+    """Public Instagram post / reel the admin wants shown on the storefront (embedded player)."""
+    __tablename__ = "instagram_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    kind = Column(String(10), default="reel")              # p / reel / tv
+    shortcode = Column(String(40), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=_utcnow)

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import client from '../api/client'
 import ProductCard from '../components/ProductCard'
-import Loader from '../components/Loader'
+import ProductSkeleton from '../components/ProductSkeleton'
+import { useWishlist } from '../context/WishlistContext'
 
 const CATEGORIES = [
   { value: '', label: 'All' },
@@ -10,11 +11,24 @@ const CATEGORIES = [
   { value: 'hoodie', label: 'Hoodies' },
 ]
 
+const SORTS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'price-asc', label: 'Price: low to high' },
+  { value: 'price-desc', label: 'Price: high to low' },
+]
+
+const chip = (active) => `font-mono text-xs uppercase tracking-widest px-4 py-2.5 border transition-colors ${active ? 'border-acid text-acid' : 'border-panel-2 text-slate hover:text-paper'}`
+
 export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams()
   const category = searchParams.get('category') || ''
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState('newest')
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [savedOnly, setSavedOnly] = useState(false)
+  const wishlist = useWishlist()
 
   useEffect(() => {
     document.title = category ? `${CATEGORIES.find((item) => item.value === category)?.label || 'Shop'} | Loopstitch Co.` : 'Shop the drop | Loopstitch Co.'
@@ -30,6 +44,21 @@ export default function Shop() {
       .finally(() => setLoading(false))
   }, [category])
 
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = products.filter((p) => {
+      if (q && !`${p.name} ${p.colorway || ''}`.toLowerCase().includes(q)) return false
+      if (inStockOnly && (p.total_stock ?? 0) === 0) return false
+      if (savedOnly && !wishlist.has(p.id)) return false
+      return true
+    })
+    if (sort === 'price-asc') list.sort((a, b) => a.price - b.price)
+    if (sort === 'price-desc') list.sort((a, b) => b.price - a.price)
+    return list
+  }, [products, query, sort, inStockOnly, savedOnly, wishlist])
+
+  const filtersActive = query || inStockOnly || savedOnly
+
   return (
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-20">
       <div className="mb-10">
@@ -37,31 +66,45 @@ export default function Shop() {
         <h1 className="font-display text-4xl sm:text-5xl uppercase text-paper">Shop</h1>
       </div>
 
-      <div className="flex gap-3 mb-10 flex-wrap">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => setSearchParams(c.value ? { category: c.value } : {})}
-            className={`font-mono text-xs uppercase tracking-widest px-4 py-2 border transition-colors ${
-              category === c.value ? 'border-acid text-acid' : 'border-panel-2 text-slate hover:text-paper'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
+        <div className="flex gap-2 flex-wrap">
+          {CATEGORIES.map((c) => (
+            <button key={c.value} onClick={() => setSearchParams(c.value ? { category: c.value } : {})} aria-pressed={category === c.value} className={chip(category === c.value)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 flex-1 lg:justify-end flex-wrap">
+          <label className="sr-only" htmlFor="shop-search">Search products</label>
+          <input id="shop-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="field-input sm:max-w-56" />
+          <label className="sr-only" htmlFor="shop-sort">Sort products</label>
+          <select id="shop-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="field-input sm:w-auto">
+            {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       </div>
 
+      <div className="flex gap-2 flex-wrap mb-8">
+        <button onClick={() => setInStockOnly((v) => !v)} aria-pressed={inStockOnly} className={chip(inStockOnly)}>In stock</button>
+        <button onClick={() => setSavedOnly((v) => !v)} aria-pressed={savedOnly} className={chip(savedOnly)}>♥ Saved ({wishlist.ids.length})</button>
+        {filtersActive && (
+          <button onClick={() => { setQuery(''); setInStockOnly(false); setSavedOnly(false) }} className="font-mono text-xs uppercase tracking-widest text-slate hover:text-riot px-2">Clear</button>
+        )}
+      </div>
+
+      <p className="font-mono text-[11px] text-slate mb-6" role="status" aria-live="polite">
+        {loading ? '' : `${visible.length} ${visible.length === 1 ? 'piece' : 'pieces'}`}
+      </p>
+
       {loading ? (
-        <Loader label="Loading catalog" />
-      ) : products.length === 0 ? (
+        <ProductSkeleton />
+      ) : visible.length === 0 ? (
         <div className="text-center py-24 text-slate font-mono text-sm">
-          Nothing here yet. Check back for the next drop.
+          {filtersActive ? 'Nothing matches those filters.' : 'Nothing here yet. Check back for the next drop.'}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
-          {products.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-10 sm:gap-y-12">
+          {visible.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
         </div>
       )}
     </div>
