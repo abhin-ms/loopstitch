@@ -32,7 +32,7 @@ export default function MobileOrderConfirmation() {
       <p style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--ls-text-muted)' }}>Order number</p>
       <p style={{ margin: '0 0 24px', fontSize: 16, fontWeight: 800, letterSpacing: '0.04em' }}>{order.order_number}</p>
       <p style={{ margin: '0 0 24px', fontSize: 13, lineHeight: 1.5, color: 'var(--ls-text-muted)' }}>
-        We'll text you when it ships from Calicut. Track it any time from your order history.
+        We'll text you when it ships. Track it any time from your order history.
       </p>
       <button className="ls-btn-primary" style={{ marginBottom: 10 }} onClick={() => navigate('/app/orders')}>View order history</button>
       <button className="ls-btn-outline" onClick={() => navigate('/app')}>Back to home</button>

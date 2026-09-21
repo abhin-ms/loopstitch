@@ -9,6 +9,7 @@ import NewsletterForm from '../components/NewsletterForm'
 import StarRating from '../components/StarRating'
 import OfferBanner from '../components/OfferBanner'
 import InstagramSection from '../components/InstagramSection'
+import SocialSection from '../components/SocialSection'
 
 const reveal = {
   hidden: { opacity: 0, y: 18 },
@@ -54,7 +55,7 @@ export default function Home() {
             transition={{ duration: 0.45 }}
             className="font-mono text-xs text-riot tracking-[0.22em] uppercase mb-5"
           >
-            DTF printing · Calicut, Kerala
+            Limited drops · Custom prints
           </motion.p>
 
           <motion.h1
@@ -72,7 +73,7 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.18 }}
             className="mt-6 max-w-2xl text-paper/70 text-sm sm:text-base leading-relaxed"
           >
-            Limited anime-inspired tees, printed in small batches and never restocked — or bring your own design and we&apos;ll print it on premium cotton. Same DTF quality, either way.
+            Limited anime-inspired tees, printed in small batches and never restocked — or bring your own design and we&apos;ll print it on premium cotton. Same quality, either way.
           </motion.p>
 
           <motion.div
@@ -161,8 +162,8 @@ export default function Home() {
           <div className="grid sm:grid-cols-3 lg:grid-cols-1 gap-4">
             {[
               ['01', 'Send your design', 'Upload artwork or tell us what you are picturing.'],
-              ['02', 'We print it', 'DTF on 240 GSM heavyweight cotton, the same process as the drops.'],
-              ['03', 'It ships', 'Printed and shipped from Calicut, Kerala, tracked door to door.'],
+              ['02', 'We print it', 'Printed on 240 GSM heavyweight cotton, the same process as the drops.'],
+              ['03', 'It ships', 'Printed, packed and shipped, tracked door to door.'],
             ].map(([number, title, copy], index) => (
               <motion.div
                 key={number}
@@ -184,8 +185,8 @@ export default function Home() {
         <div className="grid sm:grid-cols-3 gap-8 sm:gap-10">
           {[
             ['Draw', 'Whether it is our drop art or your own file, nothing goes to print without being checked first.'],
-            ['Print', 'DTF on 240 GSM heavyweight cotton. A better feel and a finish built for regular wear.'],
-            ['Ship', 'Printed and shipped from Calicut, Kerala. Tracked from our door to yours.'],
+            ['Print', 'Premium print on 240 GSM heavyweight cotton. A better feel and a finish built for regular wear.'],
+            ['Ship', 'Printed and shipped with tracking, from our door to yours.'],
           ].map(([label, copy], index) => (
             <motion.div key={label} initial={reduceMotion ? false : 'hidden'} whileInView="visible" viewport={{ once: true, amount: 0.25 }} variants={reveal} transition={{ duration: 0.45, delay: index * 0.08 }}>
               <h3 className="font-display text-2xl uppercase text-acid mb-2">{label}</h3>
@@ -212,6 +213,8 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <SocialSection />
 
       <section className="max-w-7xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
         <div className="border border-panel-2 p-6 sm:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Logo from './Logo'
+import SocialLinks from './SocialLinks'
 
 export default function Footer() {
   return (
@@ -10,8 +11,9 @@ export default function Footer() {
             <Logo />
           </div>
           <p className="text-sm text-slate leading-relaxed max-w-xs">
-            Limited anime drops and custom prints on premium tees, made in Calicut, Kerala.
+            Limited anime drops and custom prints on premium tees.
           </p>
+          <SocialLinks className="mt-4" />
         </div>
         <div>
           <div className="font-mono text-xs uppercase tracking-widest text-slate mb-4">Shop</div>
@@ -32,12 +34,11 @@ export default function Footer() {
             <li><Link to="/terms" className="hover:text-acid transition-colors">Refund, Return &amp; Cancellation</Link></li>
             <li><Link to="/terms" className="hover:text-acid transition-colors">Shipping Policy</Link></li>
             <li><a href="mailto:hello@loopstitch.online" className="hover:text-acid transition-colors">hello@loopstitch.online</a></li>
-            <li className="text-slate">Moolad, Naduvannur, Calicut - 673614</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-panel-2 px-5 py-5 text-center font-mono text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-widest text-slate-dim leading-relaxed">
-        © {new Date().getFullYear()} LOOPSTITCH CO. — LIMITED DROPS AND CUSTOM PRINTS, MADE IN CALICUT.
+        © {new Date().getFullYear()} LOOPSTITCH CO. — LIMITED DROPS AND CUSTOM PRINTS.
       </div>
     </footer>
   )

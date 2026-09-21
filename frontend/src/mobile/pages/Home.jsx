@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import client from '../../api/client'
 import ProductTile from '../components/ProductTile'
 import StitchLoader from '../components/StitchLoader'
+import { SOCIAL } from '../../utils/social'
 
 export default function MobileHome() {
   const navigate = useNavigate()
@@ -20,7 +21,7 @@ export default function MobileHome() {
     <div>
       <div style={{ padding: '20px 16px 8px' }}>
         <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>
-          DTF printing · Calicut, Kerala
+          Limited drops · Custom prints
         </p>
         <h1 style={{ margin: '0 0 10px', fontSize: 30, lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.01em' }}>
           Wear a drop.<br />Or wear your own.
@@ -62,11 +63,35 @@ export default function MobileHome() {
           Or print exactly what you want.
         </h2>
         <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.5, color: 'var(--ls-text-muted)' }}>
-          Upload artwork, a logo, or a photo — DTF printed on 240 GSM cotton, shipped from Calicut.
+          Upload artwork, a logo, or a photo — printed on 240 GSM cotton and shipped to your door.
         </p>
         <button className="ls-btn-primary" style={{ width: 'auto' }} onClick={() => navigate('/app/customize')}>
           Start your custom order →
         </button>
+      </div>
+
+      <div style={{ height: 2, background: 'var(--ls-divider)' }} />
+
+      <div style={{ padding: '20px 16px 32px' }}>
+        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>
+          Stay in the loop
+        </p>
+        <h2 style={{ margin: '0 0 14px', fontSize: 20, fontWeight: 800, lineHeight: 1.15 }}>Follow Loopstitch</h2>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {Object.values(SOCIAL).map((s) => (
+            <a
+              key={s.label}
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Follow Loopstitch on ${s.label} (opens in a new tab)`}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: '2px solid var(--ls-divider)', fontWeight: 700, fontSize: 15 }}
+            >
+              <span>{s.label} <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--ls-text-muted)' }}>{s.handle}</span></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   )

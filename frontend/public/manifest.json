@@ -1,7 +1,7 @@
 {
   "name": "Loopstitch Co.",
   "short_name": "Loopstitch",
-  "description": "Limited anime-inspired tees and custom DTF prints, made in Calicut, Kerala.",
+  "description": "Limited anime-inspired tees and custom prints.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

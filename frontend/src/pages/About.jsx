@@ -25,12 +25,12 @@ export default function About() {
       </h1>
       <div className="space-y-5 text-paper/75 text-sm sm:text-base leading-relaxed">
         <p>
-          Loopstitch Co. started in Naduvannur, Calicut, with one idea: streetwear that actually
+          Loopstitch Co. started with one idea: streetwear that actually
           gets anime right — not a licensed logo slapped on a blank tee, but original graphics designed
           for the culture.
         </p>
         <p>
-          Every drop is DTF printed on heavyweight 240 GSM cotton in small batches, usually under a
+          Every drop is printed on heavyweight 240 GSM cotton in small batches, usually under a
           hundred pieces split across a couple of colorways. We don't restock. When a size is gone,
           it's locked — permanently — which means what you're wearing genuinely won't be everywhere.
         </p>
