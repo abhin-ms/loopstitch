@@ -1940,3 +1940,95 @@ def admin_delete_instagram(post_id: int, db: Session = Depends(get_db), current:
     db.delete(row)
     db.commit()
     return {"detail": "Post removed"}
+
+
+# ============================================================
+# INSTAGRAM VIDEOS (uploaded reels that autoplay muted on the storefront)
+# ============================================================
+ALLOWED_VIDEO_TYPES = {"video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov"}
+MAX_VIDEO_SIZE = 25 * 1024 * 1024  # 25 MB
+REELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "reels")
+os.makedirs(REELS_DIR, exist_ok=True)
+
+
+@app.get("/api/instagram/videos", response_model=List[schemas.InstagramVideoOut])
+def public_instagram_videos(db: Session = Depends(get_db)):
+    return (
+        db.query(models.InstagramVideo)
+        .filter(models.InstagramVideo.is_active == True)  # noqa: E712
+        .order_by(models.InstagramVideo.created_at.desc())
+        .limit(8)
+        .all()
+    )
+
+
+@app.get("/api/admin/instagram/videos", response_model=List[schemas.InstagramVideoOut])
+def admin_list_instagram_videos(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    return db.query(models.InstagramVideo).order_by(models.InstagramVideo.created_at.desc()).all()
+
+
+@app.post("/api/admin/instagram/videos", response_model=schemas.InstagramVideoOut)
+async def admin_upload_instagram_video(
+    file: UploadFile = File(...),
+    link_url: str = Form(""),
+    db: Session = Depends(get_db),
+    current: models.Admin = Depends(auth.get_current_admin),
+):
+    ext = ALLOWED_VIDEO_TYPES.get(file.content_type)
+    if not ext:
+        raise HTTPException(status_code=400, detail="Upload an MP4, WebM or MOV video.")
+    chunks, size = [], 0
+    while chunk := await file.read(1024 * 256):
+        size += len(chunk)
+        if size > MAX_VIDEO_SIZE:
+            raise HTTPException(status_code=400, detail="Video too large. Maximum size is 25 MB.")
+        chunks.append(chunk)
+    contents = b"".join(chunks)
+    if not contents:
+        raise HTTPException(status_code=400, detail="That file is empty.")
+
+    link = link_url.strip()
+    if link and not (link.startswith("https://www.instagram.com/") or link.startswith("https://instagram.com/")):
+        raise HTTPException(status_code=422, detail="The link must be an Instagram address.")
+
+    fname = f"{uuid.uuid4().hex}{ext}"
+    if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
+        url = gcs.upload_to_gcs(contents, fname, content_type=file.content_type)
+    else:
+        with open(os.path.join(REELS_DIR, fname), "wb") as f:
+            f.write(contents)
+        url = f"/uploads/reels/{fname}"
+
+    row = models.InstagramVideo(video_url=url, link_url=link, created_at=_utcnow())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.patch("/api/admin/instagram/videos/{video_id}/toggle", response_model=schemas.InstagramVideoOut)
+def admin_toggle_instagram_video(video_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.InstagramVideo).filter(models.InstagramVideo.id == video_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Video not found")
+    row.is_active = not row.is_active
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/api/admin/instagram/videos/{video_id}")
+def admin_delete_instagram_video(video_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.InstagramVideo).filter(models.InstagramVideo.id == video_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if row.video_url.startswith("/uploads/reels/"):
+        try:
+            os.remove(os.path.join(REELS_DIR, os.path.basename(row.video_url)))
+        except OSError:
+            pass
+    elif os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
+        gcs.delete_from_gcs(gcs.get_filename_from_url(row.video_url))
+    db.delete(row)
+    db.commit()
+    return {"detail": "Video removed"}

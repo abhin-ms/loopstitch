@@ -631,3 +631,13 @@ class InstagramPostOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InstagramVideoOut(BaseModel):
+    id: int
+    video_url: str
+    link_url: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True

@@ -4,9 +4,11 @@ import client from '../../api/client'
 import ProductTile from '../components/ProductTile'
 import StitchLoader from '../components/StitchLoader'
 import { SOCIAL } from '../../utils/social'
+import ReelsCarousel from '../../components/ReelsCarousel'
 
 export default function MobileHome() {
   const navigate = useNavigate()
+  const [reels, setReels] = useState([])
   const [featured, setFeatured] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -15,6 +17,10 @@ export default function MobileHome() {
       .then((res) => setFeatured(res.data))
       .catch(() => setFeatured([]))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    client.get('/api/instagram/videos').then((res) => setReels(res.data)).catch(() => {})
   }, [])
 
   return (
@@ -69,6 +75,19 @@ export default function MobileHome() {
           Start your custom order →
         </button>
       </div>
+
+      {reels.length > 0 && (
+        <>
+          <div style={{ height: 2, background: 'var(--ls-divider)' }} />
+          <div style={{ padding: '20px 16px 24px' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>
+              On Instagram
+            </p>
+            <h2 style={{ margin: '0 0 14px', fontSize: 20, fontWeight: 800, lineHeight: 1.15 }}>Fresh off the feed</h2>
+            <ReelsCarousel videos={reels} />
+          </div>
+        </>
+      )}
 
       <div style={{ height: 2, background: 'var(--ls-divider)' }} />
 

@@ -388,3 +388,14 @@ class InstagramPost(Base):
     shortcode = Column(String(40), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=_utcnow)
+
+
+class InstagramVideo(Base):
+    """A reel video uploaded by the admin and played (muted, looping) on the storefront."""
+    __tablename__ = "instagram_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_url = Column(String(500), nullable=False)
+    link_url = Column(String(300), default="")   # where the Instagram label sends people (post or profile)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=_utcnow)
