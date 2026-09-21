@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "online.loopstitch.twa",
+      "sha256_cert_fingerprints": [
+        "F4:8A:1E:E9:64:1C:25:78:90:9E:0B:A4:71:9C:BA:70:2A:73:7E:2F:E5:6A:A8:E4:18:90:BE:C4:03:8B:DF:C6"
+      ]
+    }
+  }
+]

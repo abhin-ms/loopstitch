@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/webp" href="/preview.webp" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B0B0D" />
     <meta name="description" content="Loopstitch Co. — small-batch DTF-printed streetwear for anime fans, made in Calicut, Kerala. Limited drops, never restocked, plus custom printing." />
     <title>Loopstitch Co. — Anime x Streetwear</title>
 
@@ -40,10 +39,71 @@
         }
       }
     </script>
+
+    <!-- PWA / installable app -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ec3013" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Loopstitch" />
+
+    <!-- Boot splash — inlined so it paints before the CSS/JS bundle arrives. -->
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #201e1d;
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      #boot-splash.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #boot-splash .stitch-line { stroke-dasharray: 7 7; animation: boot-stitch-dash 0.9s linear infinite; }
+      #boot-splash .stitch-bead { animation: boot-stitch-bead 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      #boot-splash .stitch-word {
+        font-family: 'Archivo', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #f8f4f4;
+      }
+      @keyframes boot-stitch-dash { to { stroke-dashoffset: -28; } }
+      @keyframes boot-stitch-bead {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(108px); }
+      }
+      @media (prefers-color-scheme: light) {
+        #boot-splash { background: #f3f2f2; }
+        #boot-splash .stitch-word { color: #201e1d; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .stitch-line, #boot-splash .stitch-bead { animation: none; }
+      }
+    </style>
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to content</a>
+    <div id="boot-splash" aria-hidden="true">
+      <svg width="120" height="16" viewBox="0 0 120 16" fill="none">
+        <line class="stitch-line" x1="4" y1="8" x2="116" y2="8" stroke="#ec3013" stroke-width="2.5" stroke-linecap="round" />
+        <circle class="stitch-bead" cx="4" cy="8" r="4" fill="#ec3013" />
+      </svg>
+      <span class="stitch-word">Loopstitch</span>
+    </div>
     <div id="root"></div>
+    <script>
+      window.__bootStart = Date.now()
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

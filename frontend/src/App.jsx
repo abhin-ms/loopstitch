@@ -41,6 +41,19 @@ const AdminInstagram = lazy(() => import('./pages/admin/AdminInstagram'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminSubscribers = lazy(() => import('./pages/admin/AdminSubscribers'))
 
+const MobileLayout = lazy(() => import('./mobile/MobileLayout'))
+const MobileHome = lazy(() => import('./mobile/pages/Home'))
+const MobileShop = lazy(() => import('./mobile/pages/Shop'))
+const MobileProductDetail = lazy(() => import('./mobile/pages/ProductDetail'))
+const MobileCustomize = lazy(() => import('./mobile/pages/Customize'))
+const MobileCustomCheckout = lazy(() => import('./mobile/pages/CustomCheckout'))
+const MobileCart = lazy(() => import('./mobile/pages/Cart'))
+const MobileCheckout = lazy(() => import('./mobile/pages/Checkout'))
+const MobileOrderConfirmation = lazy(() => import('./mobile/pages/OrderConfirmation'))
+const MobileOrderHistory = lazy(() => import('./mobile/pages/OrderHistory'))
+const MobileAccount = lazy(() => import('./mobile/pages/Account'))
+const MobileLogin = lazy(() => import('./mobile/pages/Login'))
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -65,6 +78,22 @@ export default function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="*" element={<NotFound />} />
+              </Route>
+
+              {/* Mobile app — Modernist design system, talks to the same live backend */}
+              <Route path="/app" element={<MobileLayout />}>
+                <Route index element={<MobileHome />} />
+                <Route path="shop" element={<MobileShop />} />
+                <Route path="product/:slug" element={<MobileProductDetail />} />
+                <Route path="customize" element={<MobileCustomize />} />
+                <Route path="customize/checkout" element={<MobileCustomCheckout />} />
+                <Route path="cart" element={<MobileCart />} />
+                <Route path="checkout" element={<MobileCheckout />} />
+                <Route path="order/confirm" element={<MobileOrderConfirmation />} />
+                <Route path="orders" element={<MobileOrderHistory />} />
+                <Route path="account" element={<MobileAccount />} />
+                <Route path="login" element={<MobileLogin />} />
+                <Route path="*" element={<Navigate to="/app" replace />} />
               </Route>
 
               {/* Hidden admin area */}

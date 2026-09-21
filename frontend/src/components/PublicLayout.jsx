@@ -6,6 +6,7 @@ import Footer from './Footer'
 import SewingCursor from './SewingCursor'
 import TouchFeedback from './TouchFeedback'
 import AnnouncementBar from './AnnouncementBar'
+import InstallAppBanner from './InstallAppBanner'
 
 const SITE = 'https://loopstitch.online'
 const PRIVATE_PATHS = ['/cart', '/checkout', '/orders', '/order/confirm']
@@ -38,6 +39,7 @@ export default function PublicLayout() {
       <SewingCursor />
       <TouchFeedback />
       <AnnouncementBar />
+      <InstallAppBanner />
       <Navbar />
       <main id="main" className="flex-1">
         <Suspense fallback={<Loader label="Loading" />}>

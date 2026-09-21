@@ -1,0 +1,335 @@
+/* Loopstitch Mobile App — "Modernist" design system (flat, zero radius, Archivo) */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
+
+.mobile-app-shell {
+  min-height: 100vh;
+  background: #0f0f0f;
+  display: flex;
+  justify-content: center;
+}
+
+.mobile-app {
+  --ls-bg: #201e1d;
+  --ls-surface: #2d2b2b;
+  --ls-text: #f8f4f4;
+  --ls-text-muted: rgba(248, 244, 244, 0.55);
+  --ls-divider: rgba(248, 244, 244, 0.35);
+  --ls-accent: #ff563c;
+  --ls-accent-tint: #4d170e;
+  --ls-accent-tint-text: #ffc4b8;
+  --ls-on-accent: #201e1d;
+
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ls-bg);
+  color: var(--ls-text);
+  font-family: 'Archivo', system-ui, sans-serif;
+  position: relative;
+}
+
+:root[data-theme='light'] .mobile-app {
+  --ls-bg: #f3f2f2;
+  --ls-surface: #eae9e9;
+  --ls-text: #201e1d;
+  --ls-text-muted: rgba(32, 30, 29, 0.55);
+  --ls-divider: rgba(32, 30, 29, 0.4);
+  --ls-accent: #ec3013;
+  --ls-accent-tint: #fff2ef;
+  --ls-accent-tint-text: #7c1405;
+  --ls-on-accent: #f8f4f4;
+}
+
+.mobile-app * { box-sizing: border-box; }
+.mobile-app a { color: inherit; text-decoration: none; }
+.mobile-app button { font-family: inherit; }
+.mobile-app ::selection { background: rgba(236, 48, 19, 0.3); }
+
+.mobile-app input,
+.mobile-app textarea {
+  font-family: inherit;
+}
+
+/* ---------- Header ---------- */
+.ls-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 2px solid var(--ls-divider);
+  flex: none;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ls-bg);
+}
+
+.ls-icon-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ls-text);
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ls-header-title {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  flex: 1;
+}
+
+.ls-cart-wrap { position: relative; }
+
+.ls-cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: var(--ls-accent);
+  color: var(--ls-on-accent);
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- Tab bar ---------- */
+.ls-tabbar {
+  flex: none;
+  display: flex;
+  border-top: 2px solid var(--ls-divider);
+  background: var(--ls-bg);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+.ls-tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ls-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px 8px;
+  cursor: pointer;
+}
+
+.ls-tab.active { color: var(--ls-accent); }
+
+.ls-tab-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Buttons ---------- */
+.ls-btn-primary {
+  border: 0;
+  background: var(--ls-accent);
+  color: var(--ls-on-accent);
+  font-weight: 800;
+  font-size: 13px;
+  padding: 15px 16px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.ls-btn-primary:disabled {
+  background: var(--ls-divider);
+  color: var(--ls-text-muted);
+  cursor: not-allowed;
+}
+
+.ls-btn-outline {
+  border: 1px solid var(--ls-divider);
+  background: transparent;
+  color: var(--ls-text);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.ls-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Chips / segmented options ---------- */
+.ls-chip {
+  border: 1px solid var(--ls-divider);
+  color: var(--ls-text-muted);
+  background: transparent;
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.ls-chip.active { border-color: var(--ls-accent); color: var(--ls-accent); }
+
+.ls-option {
+  border: 1px solid var(--ls-divider);
+  color: var(--ls-text);
+  background: transparent;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 10px 14px;
+  flex: 1;
+  cursor: pointer;
+  text-align: center;
+}
+
+.ls-option.active {
+  border-color: var(--ls-accent);
+  background: var(--ls-accent);
+  color: var(--ls-on-accent);
+}
+
+/* ---------- Inputs ---------- */
+.ls-field-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ls-text-muted);
+}
+
+.ls-input,
+.ls-textarea {
+  width: 100%;
+  min-height: 40px;
+  background: var(--ls-surface);
+  border: 1px solid var(--ls-divider);
+  color: var(--ls-text);
+  font-size: 13px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.ls-input:focus,
+.ls-textarea:focus { border-color: var(--ls-accent); }
+
+.ls-textarea { min-height: 80px; resize: vertical; }
+
+/* ---------- Size grid ---------- */
+.ls-size-btn {
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 44px;
+  height: 44px;
+  cursor: pointer;
+  border: 1px solid var(--ls-divider);
+  color: var(--ls-text);
+  background: transparent;
+}
+
+.ls-size-btn.selected {
+  border-color: var(--ls-accent);
+  background: var(--ls-accent);
+  color: var(--ls-on-accent);
+}
+
+.ls-size-btn.disabled {
+  color: var(--ls-text-muted);
+  text-decoration: line-through;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Product swatches ---------- */
+.ls-swatch {
+  position: relative;
+  background: repeating-linear-gradient(135deg, var(--ls-surface) 0px, var(--ls-surface) 10px, var(--ls-bg) 10px, var(--ls-bg) 20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ls-swatch img { width: 100%; height: 100%; object-fit: cover; }
+
+.ls-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 3px 6px;
+}
+
+.ls-badge-limited { background: var(--ls-accent); color: var(--ls-on-accent); }
+.ls-badge-soldout { border: 1px solid var(--ls-accent); color: var(--ls-accent); background: var(--ls-bg); }
+
+/* ---------- Toast ---------- */
+.ls-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ls-text);
+  color: var(--ls-bg);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 11px 18px;
+  z-index: 50;
+  animation: ls-toastIn 0.18s ease-out;
+  white-space: nowrap;
+}
+
+@keyframes ls-toastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ---------- Stitch loader ---------- */
+.ls-stitch-line {
+  animation: ls-stitch-dash 0.9s linear infinite;
+}
+
+.ls-stitch-bead {
+  animation: ls-stitch-bead 1.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes ls-stitch-dash {
+  to { stroke-dashoffset: -24; }
+}
+
+@keyframes ls-stitch-bead {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(90px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-stitch-line, .ls-stitch-bead { animation: none; }
+}
+
+/* ---------- Stepper ---------- */
+.ls-stepper-btn {
+  border: 1px solid var(--ls-divider);
+  background: transparent;
+  color: var(--ls-text);
+  width: 26px;
+  height: 26px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ls-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }

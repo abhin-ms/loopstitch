@@ -20,6 +20,7 @@ export default function Footer() {
             <li><Link to="/shop?category=tshirt" className="hover:text-acid transition-colors">Tees</Link></li>
             <li><Link to="/customize" className="hover:text-acid transition-colors">Custom printing</Link></li>
             <li><Link to="/cart" className="hover:text-acid transition-colors">Cart</Link></li>
+            <li><Link to="/app" className="hover:text-acid transition-colors">Open mobile app →</Link></li>
           </ul>
         </div>
         <div>
