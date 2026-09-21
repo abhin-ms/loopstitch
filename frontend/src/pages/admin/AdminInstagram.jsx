@@ -87,6 +87,15 @@ export default function AdminInstagram() {
         <p className="font-mono text-[11px] text-slate">Shown on the home page under &ldquo;Fresh off the feed&rdquo;.</p>
       </div>
 
+      {videos && posts && videos.filter((v) => v.is_active).length === 0 && posts.some((x) => x.is_active) && (
+        <div className="border border-riot p-4" role="status">
+          <p className="font-mono text-xs uppercase tracking-widest text-riot mb-1">Your home page is showing embedded posts</p>
+          <p className="text-sm text-paper/80 leading-relaxed">
+            Instagram&rsquo;s own player shows the profile name and header, and it cannot autoplay. To get autoplaying reels with just an &ldquo;Instagram&rdquo; label, upload the video files under <strong>Reel videos</strong> below. As soon as one active video exists, the embedded posts are hidden.
+          </p>
+        </div>
+      )}
+
       {/* ---- autoplay videos ---- */}
       <section aria-labelledby="reels-h">
         <h2 id="reels-h" className="font-mono text-xs uppercase tracking-widest text-acid mb-2">Reel videos (recommended)</h2>
