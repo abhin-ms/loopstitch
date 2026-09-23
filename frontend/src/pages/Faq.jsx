@@ -10,7 +10,7 @@ function buildFaq(cod) {
     {
       id: 'sizing', title: 'Fit & sizing', items: [
         ['Are the tees unisex?', 'Yes. Every Loopstitch tee is cut unisex with an oversized, dropped-shoulder fit, made to be worn by anyone.'],
-        ['What size should I get?', `Most people wear their usual size for the intended oversized look. If you usually buy women's sizes, go one size down for a relaxed fit. Sizes run ${SIZE_CHART.map((r) => r.size).join(', ')}; use the size guide below to compare measurements.`],
+        ['What size should I get?', `Most people wear their usual size for the intended oversized look. If you usually buy women's sizes, go one size down for a relaxed fit. Sizes run ${SIZE_CHART.map((r) => r.size).join(', ')}; use the size guide below to compare measurements. We can't exchange for size or fit, so please check before ordering.`],
         ['Will it shrink?', 'Wash cold and inside out, and dry in the shade, to keep the fit and the print at their best.'],
       ],
     },
@@ -20,7 +20,7 @@ function buildFaq(cod) {
           ? `Online by UPI, card or netbanking through Razorpay. Cash on delivery is also available: you pay ${cod.cod_advance_percent}% online to confirm the order and the rest on delivery.`
           : 'Online by UPI, card or netbanking through Razorpay.'],
         ['How do I track my order?', 'Log in with your phone number (top right of the site) and open My Orders to see every order and its status.'],
-        ['Can I cancel my order?', 'Cancellation requests are considered within 10 days of placing the order, but not once the order has been shipped or is out for delivery. In that case you can refuse it at the doorstep.'],
+        ['Can I cancel my order?', 'Yes, within 10 days of placing it, as long as it has not been shipped yet. Once it has shipped or is out for delivery it can no longer be cancelled, but you can refuse it at the doorstep.'],
       ],
     },
     {
@@ -31,9 +31,9 @@ function buildFaq(cod) {
     },
     {
       id: 'returns', title: 'Returns & exchanges', items: [
-        ['Can I return or exchange a tee?', 'Yes, within 10 days of purchase, as long as it is unused, in the condition you received it and in its original packaging. Items bought on sale may not be eligible.'],
-        ['What if my order arrives damaged or wrong?', 'Report it to us within 10 days of receiving it and we will check it and arrange a replacement or refund.'],
-        ['How long do refunds take?', 'Approved refunds are processed within 14 days.'],
+        ['Can I return or exchange a tee?', 'We accept returns only for items that arrive damaged, defective or different from what you ordered. We cannot exchange for size, fit or change of mind, so please use the size guide before ordering.'],
+        ['What if my order arrives damaged, defective or wrong?', 'Email hello@loopstitch.online within 10 days of delivery with your order number and photos. The item must be unused and in its original packaging. Return shipping is free, and we send you a replacement of the same tee. If we cannot replace it, you get a full refund.'],
+        ['When do I get a refund?', 'Refunds are given when you cancel before the order ships, or when a faulty or wrong item cannot be replaced. Approved refunds reach your original payment method within 14 days.'],
       ],
     },
     {

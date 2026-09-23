@@ -26,7 +26,7 @@ const SECTIONS = [
     body: () => (
       <>
         <p>Dispatched within 3 days of your order, by registered courier, with tracking.</p>
-        <p>Refund or exchange within 10 days of purchase, if the tee is unused and in its original packaging. Sale items may not be eligible.</p>
+        <p>Damaged, defective or wrong item? Tell us within 10 days of delivery and we replace it, with free return shipping. We can&apos;t exchange for size or fit, so please check the size guide first.</p>
         <p>
           <Link to="/privacy#shipping" className="underline underline-offset-4 hover:text-acid">Shipping policy</Link>
           {' · '}

@@ -216,40 +216,12 @@ export default function Privacy() {
         </section>
 
         <section>
-          <p>
-            This refund and cancellation policy outlines how you can cancel or seek a refund for a
-            product / service that you have purchased through the Platform. Under this policy:
-          </p>
+          <p>This policy explains when you can cancel an order and when you receive a refund.</p>
           <ol className="list-decimal list-inside mt-2 space-y-2">
-            <li>
-              Cancellations will only be considered if the request is made within 10 days of placing
-              the order. However, cancellation requests may not be entertained if the orders have been
-              communicated to such sellers / merchant(s) listed on the Platform and they have initiated
-              the process of shipping them, or the product is out for delivery. In such an event, you
-              may choose to reject the product at the doorstep.
-            </li>
-            <li>
-              Loopstitch does not accept cancellation requests for perishable items like flowers,
-              eatables, etc. However, the refund / replacement can be made if the user establishes that
-              the quality of the product delivered is not good.
-            </li>
-            <li>
-              In case of receipt of damaged or defective items, please report to our customer service
-              team. The request would be entertained once the seller/ merchant listed on the Platform,
-              has checked and determined the same at its own end. This should be reported within 10
-              days of receipt of products. In case you feel that the product received is not as shown on
-              the site or as per your expectations, you must bring it to the notice of our customer
-              service within 10 days of receiving the product. The customer service team after looking
-              into your complaint will take an appropriate decision.
-            </li>
-            <li>
-              In case of complaints regarding the products that come with a warranty from the
-              manufacturers, please refer the issue to them.
-            </li>
-            <li>
-              In case of any refunds approved by Loopstitch, it will take 14 days for the refund to be
-              processed to you.
-            </li>
+            <li>Cancellation: you can cancel an order within 10 days of placing it, as long as it has not been shipped yet. Once an order has been shipped or is out for delivery it can no longer be cancelled, but you may refuse it at the doorstep.</li>
+            <li>Refunds are issued only (a) when an order is cancelled before it ships, or (b) when a damaged, defective or wrong item cannot be replaced, for example because that design or size has sold out (our drops are never restocked).</li>
+            <li>We do not offer refunds or exchanges for change of mind, fit or size. Please check the size guide on each product page before ordering.</li>
+            <li>Approved refunds are processed to your original payment method within 14 days.</li>
           </ol>
         </section>
 
@@ -261,24 +233,14 @@ export default function Privacy() {
         </section>
 
         <section>
-          <p>
-            We offer refund / exchange within first 10 days from the date of your purchase. If 10 days
-            have passed since your purchase, you will not be offered a return, exchange or refund of any
-            kind. In order to become eligible for a return or an exchange, (i) the purchased item should
-            be unused and in the same condition as you received it, (ii) the item must have original
-            packaging, (iii) if the item that you purchased on a sale, then the item may not be eligible
-            for a return / exchange. Further, only such items are replaced by us (based on an exchange
-            request), if such items are found defective or damaged.
-          </p>
-          <p className="mt-3">
-            You agree that there may be a certain category of products / items that are exempted from
-            returns or refunds. Such categories of the products would be identified to you at the time
-            of purchase. For exchange / return accepted request(s) (as applicable), once your returned
-            product / item is received and inspected by us, we will send you an email to notify you
-            about receipt of the returned / exchanged product. Further, if the same has been approved
-            after the quality check at our end, your request (i.e. return / exchange) will be processed
-            in accordance with our policies.
-          </p>
+          <p>We accept returns only for items that arrive damaged, defective (for example a printing or stitching fault) or different from what you ordered (wrong design, colour or size).</p>
+          <ol className="list-decimal list-inside mt-2 space-y-2">
+            <li>Report the problem within 10 days of delivery by emailing hello@loopstitch.online with your order number and photos of the item and its packaging.</li>
+            <li>The item must be unused and in its original packaging.</li>
+            <li>Return shipping is free: we will arrange the return pickup or reimburse your courier charge.</li>
+            <li>Once we receive and check the item, we send you a replacement of the same design, colour and size at no cost. If a replacement is not possible, we refund you in full.</li>
+          </ol>
+          <p className="mt-3">We cannot accept returns or exchanges for size or fit, change of mind, or items that have been worn, washed or damaged after delivery. Custom-printed tees are made to your design, so they are replaced only if there is a printing or product fault on our side.</p>
         </section>
 
         {/* ── SHIPPING POLICY ── */}
