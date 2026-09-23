@@ -118,7 +118,7 @@ export default function MobileProductDetail() {
           <p style={{ margin: '20px 0 0', fontSize: 13, lineHeight: 1.6, color: 'var(--ls-text-muted)' }}>{product.description}</p>
         )}
         <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.6, color: 'var(--ls-text-muted)' }}>
-          Printed on 240 GSM heavyweight cotton. Part of a limited run — once a size sells out it is retired, not restocked.
+          Printed on premium 250 GSM cotton fabric. Part of a limited run — once a size sells out it is retired, not restocked.
         </p>
       </div>
     </div>

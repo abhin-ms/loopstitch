@@ -69,7 +69,7 @@ export default function MobileHome() {
           Or print exactly what you want.
         </h2>
         <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.5, color: 'var(--ls-text-muted)' }}>
-          Upload artwork, a logo, or a photo — printed on 240 GSM cotton and shipped to your door.
+          Upload artwork, a logo, or a photo — printed on premium 250 GSM cotton and shipped to your door.
         </p>
         <button className="ls-btn-primary" style={{ width: 'auto' }} onClick={() => navigate('/app/customize')}>
           Start your custom order →

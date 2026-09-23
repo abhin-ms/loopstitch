@@ -162,7 +162,7 @@ export default function Home() {
           <div className="grid sm:grid-cols-3 lg:grid-cols-1 gap-4">
             {[
               ['01', 'Send your design', 'Upload artwork or tell us what you are picturing.'],
-              ['02', 'We print it', 'Printed on 240 GSM heavyweight cotton, the same process as the drops.'],
+              ['02', 'We print it', 'Printed on premium 250 GSM cotton fabric, the same process as the drops.'],
               ['03', 'It ships', 'Printed, packed and shipped, tracked door to door.'],
             ].map(([number, title, copy], index) => (
               <motion.div
@@ -185,7 +185,7 @@ export default function Home() {
         <div className="grid sm:grid-cols-3 gap-8 sm:gap-10">
           {[
             ['Draw', 'Whether it is our drop art or your own file, nothing goes to print without being checked first.'],
-            ['Print', 'Premium print on 240 GSM heavyweight cotton. A better feel and a finish built for regular wear.'],
+            ['Print', 'Premium 250 GSM cotton fabric with a quality print. A better feel and a finish built for regular wear.'],
             ['Ship', 'Printed and shipped with tracking, from our door to yours.'],
           ].map(([label, copy], index) => (
             <motion.div key={label} initial={reduceMotion ? false : 'hidden'} whileInView="visible" viewport={{ once: true, amount: 0.25 }} variants={reveal} transition={{ duration: 0.45, delay: index * 0.08 }}>

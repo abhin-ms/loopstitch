@@ -30,7 +30,7 @@ export default function About() {
           for the culture.
         </p>
         <p>
-          Every drop is printed on heavyweight 240 GSM cotton in small batches, usually under a
+          Every drop is printed on premium 250 GSM cotton fabric in small batches, usually under a
           hundred pieces split across a couple of colorways. We don't restock. When a size is gone,
           it's locked — permanently — which means what you're wearing genuinely won't be everywhere.
         </p>

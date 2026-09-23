@@ -36,7 +36,7 @@ def main():
             if add_demo == "y":
                 p1 = models.Product(
                     name="Ronin Wave Tee", slug="ronin-wave-tee",
-                    description="Oversized print, heavyweight 240 GSM cotton. Inspired by ukiyo-e wave art with a modern streetwear cut.",
+                    description="Oversized print on premium 250 GSM cotton fabric. Inspired by ukiyo-e wave art with a modern streetwear cut.",
                     price=899, compare_at_price=1199, category="tshirt", colorway="Black",
                     is_active=True, is_featured=True,
                 )

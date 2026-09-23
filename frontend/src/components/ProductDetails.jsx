@@ -16,7 +16,7 @@ const SECTIONS = [
     title: 'Fabric & care',
     body: () => (
       <>
-        <p>240 GSM heavyweight cotton with a premium print.</p>
+        <p>Premium 250 GSM cotton fabric with a quality print.</p>
         <p>Wash cold, inside out. Don&apos;t iron directly on the print, don&apos;t bleach, and dry in the shade.</p>
       </>
     ),
