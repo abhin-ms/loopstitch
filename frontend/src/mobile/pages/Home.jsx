@@ -27,7 +27,7 @@ export default function MobileHome() {
     <div>
       <div style={{ padding: '20px 16px 8px' }}>
         <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>
-          Limited drops · Custom prints
+          Unisex oversized tees · Limited drops
         </p>
         <h1 style={{ margin: '0 0 10px', fontSize: 30, lineHeight: 1.05, fontWeight: 800, letterSpacing: '-0.01em' }}>
           Wear a drop.<br />Or wear your own.

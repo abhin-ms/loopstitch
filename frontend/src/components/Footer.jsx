@@ -11,7 +11,7 @@ export default function Footer() {
             <Logo />
           </div>
           <p className="text-sm text-slate leading-relaxed max-w-xs">
-            Limited anime drops and custom prints on premium tees.
+            Unisex oversized tees — limited anime drops and custom prints.
           </p>
           <SocialLinks className="mt-4" />
         </div>
@@ -19,7 +19,6 @@ export default function Footer() {
           <div className="font-mono text-xs uppercase tracking-widest text-slate mb-4">Shop</div>
           <ul className="space-y-2 text-sm text-paper/80">
             <li><Link to="/shop" className="hover:text-acid transition-colors">All products</Link></li>
-            <li><Link to="/shop?category=tshirt" className="hover:text-acid transition-colors">Tees</Link></li>
             <li><Link to="/customize" className="hover:text-acid transition-colors">Custom printing</Link></li>
             <li><Link to="/cart" className="hover:text-acid transition-colors">Cart</Link></li>
             <li><Link to="/app" className="hover:text-acid transition-colors">Open mobile app →</Link></li>
@@ -31,8 +30,9 @@ export default function Footer() {
             <li><Link to="/about" className="hover:text-acid transition-colors">About the brand</Link></li>
             <li><Link to="/terms" className="hover:text-acid transition-colors">Terms &amp; Conditions</Link></li>
             <li><Link to="/privacy" className="hover:text-acid transition-colors">Privacy Policy</Link></li>
-            <li><Link to="/terms" className="hover:text-acid transition-colors">Refund, Return &amp; Cancellation</Link></li>
-            <li><Link to="/terms" className="hover:text-acid transition-colors">Shipping Policy</Link></li>
+            <li><Link to="/privacy#refunds" className="hover:text-acid transition-colors">Refund, Return &amp; Cancellation</Link></li>
+            <li><Link to="/privacy#shipping" className="hover:text-acid transition-colors">Shipping Policy</Link></li>
+            <li><Link to="/faq" className="hover:text-acid transition-colors">FAQ &amp; size help</Link></li>
             <li><a href="mailto:hello@loopstitch.online" className="hover:text-acid transition-colors">hello@loopstitch.online</a></li>
           </ul>
         </div>

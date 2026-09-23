@@ -1,7 +1,7 @@
 const POINTS = [
   ['Secure payments', 'Razorpay · UPI, cards, netbanking'],
-  ['Ships in 3–5 days', 'Tracked, door to door'],
-  ['Heavyweight 240 GSM', 'Print built for regular wear'],
+  ['Dispatched in 3 days', 'Tracked, door to door'],
+  ['Unisex oversized fit', '240 GSM heavyweight cotton'],
   ['Check before print', 'Every design is reviewed first'],
 ]
 

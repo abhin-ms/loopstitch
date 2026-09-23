@@ -211,7 +211,7 @@ export default function Privacy() {
         {/* ── REFUND AND CANCELLATION POLICY ── */}
         <hr className="cutline my-12" />
 
-        <section>
+        <section id="refunds" className="scroll-mt-24">
           <h2 className="font-display text-2xl uppercase text-paper mb-3">Refund and Cancellation Policy</h2>
         </section>
 
@@ -256,7 +256,7 @@ export default function Privacy() {
         {/* ── RETURN POLICY ── */}
         <hr className="cutline my-12" />
 
-        <section>
+        <section id="returns" className="scroll-mt-24">
           <h2 className="font-display text-2xl uppercase text-paper mb-3">Return Policy</h2>
         </section>
 
@@ -284,7 +284,7 @@ export default function Privacy() {
         {/* ── SHIPPING POLICY ── */}
         <hr className="cutline my-12" />
 
-        <section>
+        <section id="shipping" className="scroll-mt-24">
           <h2 className="font-display text-2xl uppercase text-paper mb-3">Shipping Policy</h2>
         </section>
 

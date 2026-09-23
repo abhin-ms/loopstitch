@@ -3,38 +3,23 @@ import client from '../../api/client'
 import ProductTile from '../components/ProductTile'
 import StitchLoader from '../components/StitchLoader'
 
-const CATEGORIES = [
-  { value: '', label: 'All' },
-  { value: 'tshirt', label: 'Tees' },
-  { value: 'hoodie', label: 'Hoodies' },
-]
-
 export default function MobileShop() {
-  const [category, setCategory] = useState('')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    client.get('/api/products', { params: category ? { category } : {} })
+    client.get('/api/products')
       .then((res) => setProducts(res.data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [category])
+  }, [])
 
   return (
     <div style={{ padding: '18px 16px' }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.value}
-            className={`ls-chip${category === c.value ? ' active' : ''}`}
-            onClick={() => setCategory(c.value)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>
+        Unisex · Oversized fit
+      </p>
 
       {loading ? (
         <StitchLoader label="Loading catalog" />

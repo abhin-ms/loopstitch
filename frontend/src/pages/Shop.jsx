@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import client from '../api/client'
 import ProductCard from '../components/ProductCard'
 import ProductSkeleton from '../components/ProductSkeleton'
 import { useWishlist } from '../context/WishlistContext'
-
-const CATEGORIES = [
-  { value: '', label: 'All' },
-  { value: 'tshirt', label: 'Tees' },
-  { value: 'hoodie', label: 'Hoodies' },
-]
 
 const SORTS = [
   { value: 'newest', label: 'Newest' },
@@ -20,8 +13,6 @@ const SORTS = [
 const chip = (active) => `font-mono text-xs uppercase tracking-widest px-4 py-2.5 border transition-colors ${active ? 'border-acid text-acid' : 'border-panel-2 text-slate hover:text-paper'}`
 
 export default function Shop() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const category = searchParams.get('category') || ''
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -31,18 +22,18 @@ export default function Shop() {
   const wishlist = useWishlist()
 
   useEffect(() => {
-    document.title = category ? `${CATEGORIES.find((item) => item.value === category)?.label || 'Shop'} | Loopstitch Co.` : 'Shop the drop | Loopstitch Co.'
+    document.title = 'Shop unisex oversized tees | Loopstitch Co.'
     return () => { document.title = 'Loopstitch Co.' }
-  }, [category])
+  }, [])
 
   useEffect(() => {
     setLoading(true)
     client
-      .get('/api/products', { params: category ? { category } : {} })
+      .get('/api/products')
       .then((res) => setProducts(res.data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [category])
+  }, [])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -62,18 +53,12 @@ export default function Shop() {
   return (
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-20">
       <div className="mb-10">
-        <p className="font-mono text-xs text-riot tracking-widest uppercase mb-2">Full catalog</p>
-        <h1 className="font-display text-4xl sm:text-5xl uppercase text-paper">Shop</h1>
+        <p className="font-mono text-xs text-riot tracking-widest uppercase mb-2">Unisex · Oversized fit</p>
+        <h1 className="font-display text-4xl sm:text-5xl uppercase text-paper">Shop the drop</h1>
+        <p className="text-sm text-slate mt-3 max-w-xl">Every tee is cut unisex with a relaxed, dropped-shoulder fit. Not sure of your size? <a href="/faq#sizing" className="underline underline-offset-4 hover:text-acid">See the size help</a>.</p>
       </div>
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
-        <div className="flex gap-2 flex-wrap">
-          {CATEGORIES.map((c) => (
-            <button key={c.value} onClick={() => setSearchParams(c.value ? { category: c.value } : {})} aria-pressed={category === c.value} className={chip(category === c.value)}>
-              {c.label}
-            </button>
-          ))}
-        </div>
         <div className="flex gap-2 flex-1 lg:justify-end flex-wrap">
           <label className="sr-only" htmlFor="shop-search">Search products</label>
           <input id="shop-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="field-input sm:max-w-56" />

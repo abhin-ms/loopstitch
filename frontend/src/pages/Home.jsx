@@ -55,7 +55,7 @@ export default function Home() {
             transition={{ duration: 0.45 }}
             className="font-mono text-xs text-riot tracking-[0.22em] uppercase mb-5"
           >
-            Limited drops · Custom prints
+            Unisex oversized tees · Limited drops
           </motion.p>
 
           <motion.h1
@@ -73,7 +73,7 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.18 }}
             className="mt-6 max-w-2xl text-paper/70 text-sm sm:text-base leading-relaxed"
           >
-            Limited anime-inspired tees, printed in small batches and never restocked — or bring your own design and we&apos;ll print it on premium cotton. Same quality, either way.
+            Unisex oversized anime tees for everyone, printed in small batches and never restocked — or bring your own design and we&apos;ll print it on premium cotton. Same quality, either way.
           </motion.p>
 
           <motion.div

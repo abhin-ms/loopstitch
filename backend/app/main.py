@@ -2032,3 +2032,23 @@ def admin_delete_instagram_video(video_id: int, db: Session = Depends(get_db), c
     db.delete(row)
     db.commit()
     return {"detail": "Video removed"}
+
+
+# ============================================================
+# SITEMAP (served at /sitemap.xml via nginx)
+# ============================================================
+SITE_URL = os.getenv("SITE_URL", "https://loopstitch.online").rstrip("/")
+STATIC_PAGES = [("/", "1.0"), ("/shop", "0.9"), ("/customize", "0.8"), ("/faq", "0.6"), ("/about", "0.5"), ("/terms", "0.3"), ("/privacy", "0.3")]
+
+
+@app.get("/api/sitemap.xml")
+def sitemap(db: Session = Depends(get_db)):
+    from xml.sax.saxutils import escape
+    urls = [f"<url><loc>{SITE_URL}{path}</loc><priority>{prio}</priority></url>" for path, prio in STATIC_PAGES]
+    products = db.query(models.Product).filter(models.Product.is_active == True).all()  # noqa: E712
+    for p in products:
+        stamp = (p.updated_at or p.created_at)
+        lastmod = f"<lastmod>{stamp.date().isoformat()}</lastmod>" if stamp else ""
+        urls.append(f"<url><loc>{SITE_URL}/product/{escape(p.slug)}</loc>{lastmod}<priority>0.8</priority></url>")
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
+    return Response(content=body, media_type="application/xml")

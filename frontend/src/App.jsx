@@ -18,6 +18,7 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
 const OrderHistory = lazy(() => import('./pages/OrderHistory'))
 const Customize = lazy(() => import('./pages/Customize'))
+const Faq = lazy(() => import('./pages/Faq'))
 const About = lazy(() => import('./pages/About'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
@@ -74,6 +75,7 @@ export default function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order/confirm" element={<OrderConfirmation />} />
                 <Route path="/orders" element={<OrderHistory />} />
+                <Route path="/faq" element={<Faq />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />

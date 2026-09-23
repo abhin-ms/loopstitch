@@ -9,6 +9,9 @@ import Loader from '../components/Loader'
 import SizeGuide from '../components/SizeGuide'
 import ProductReviews from '../components/ProductReviews'
 import StarRating from '../components/StarRating'
+import ProductDetails from '../components/ProductDetails'
+import RecentlyViewed from '../components/RecentlyViewed'
+import { pushRecent } from '../utils/recentlyViewed'
 import { useWishlist } from '../context/WishlistContext'
 import { haptic } from '../utils/haptics'
 
@@ -40,6 +43,7 @@ export default function ProductDetail() {
       .get(`/api/products/${slug}`)
       .then((res) => {
         setProduct(res.data)
+        pushRecent({ slug: res.data.slug, name: res.data.name, price: res.data.price, image: (res.data.colors?.[0]?.images || res.data.images || [])[0]?.url || '' })
         setActiveImage(0)
         setSelectedColorId(res.data.colors?.[0]?.id || null)
         setSelectedSize(null)
@@ -75,6 +79,7 @@ export default function ProductDetail() {
       '@context': 'https://schema.org', '@type': 'Product', name: product.name,
       description, image: (product.colors?.[0]?.images || product.images || []).map((image) => mediaUrl(image.url)),
       sku: product.slug,
+      audience: { '@type': 'PeopleAudience', suggestedGender: 'unisex' },
       ...(rating.count > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: rating.average, reviewCount: rating.count } } : {}),
       offers: { '@type': 'Offer', priceCurrency: 'INR', price: product.price, availability: product.total_stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: window.location.href },
     })
@@ -183,6 +188,7 @@ export default function ProductDetail() {
             <div className="mb-6"><div className="flex items-center justify-between mb-3"><span className="font-mono text-xs uppercase tracking-widest text-slate">Color</span><span className="font-mono text-xs text-paper">{selectedColor.name}</span></div><div className="flex flex-wrap gap-3">{colors.map((color) => <button key={color.id || color.name} type="button" onClick={() => { setSelectedColorId(color.id); setActiveImage(0); setSelectedSize(null); setQuantity(1) }} className={`flex items-center gap-2 border px-3 py-2 font-mono text-xs ${selectedColor.id === color.id ? 'border-acid text-acid' : 'border-panel-2 text-slate hover:text-paper'}`}><span className="w-4 h-4 rounded-full border border-paper/30" style={{ backgroundColor: color.hex_code || '#000000' }} />{color.name}</button>)}</div></div>
           )}
           {colors.length === 1 && product.colorway && <p className="font-mono text-xs text-slate uppercase tracking-widest mb-2">{product.colorway}</p>}
+          <p className="font-mono text-[11px] uppercase tracking-widest text-acid mb-1">Unisex · Oversized fit</p>
           <h1 className="font-display text-3xl sm:text-4xl uppercase text-paper leading-tight mb-3">{product.name}</h1>
           {rating.count > 0 && (
             <a href="#reviews-title" className="flex items-center gap-2 mb-3 w-fit">
@@ -267,16 +273,18 @@ export default function ProductDetail() {
             </button>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-panel-2 text-xs text-slate space-y-1.5 font-mono">
-            <p>· Premium print, 240 GSM heavyweight cotton</p>
-            <p>· Ships in 3–5 business days, tracked</p>
-            <p>· Limited batch — stock locks permanently once sold</p>
-          </div>
+          <ProductDetails onOpenSizeGuide={() => setGuideOpen(true)} />
         </div>
       </div>
 
       <ProductReviews slug={product.slug} onSummary={handleSummary} />
-      <SizeGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <SizeGuide
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        onPick={(size) => { setSelectedSize(size); setQuantity(1) }}
+        available={sizes.filter((x) => x.stock > 0).map((x) => x.size)}
+      />
+      <RecentlyViewed excludeSlug={product.slug} />
 
       {/* Sticky mobile add-to-cart */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-ink/95 backdrop-blur border-t border-panel-2 px-5 py-3 flex items-center gap-4">
