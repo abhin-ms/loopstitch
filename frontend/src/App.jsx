@@ -18,6 +18,9 @@ const Checkout = lazy(() => import('./pages/Checkout'))
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'))
 const OrderHistory = lazy(() => import('./pages/OrderHistory'))
 const Customize = lazy(() => import('./pages/Customize'))
+const Blog = lazy(() => import('./pages/Blog'))
+const BlogPost = lazy(() => import('./pages/BlogPost'))
+const AdminBlog = lazy(() => import('./pages/admin/AdminBlog'))
 const Faq = lazy(() => import('./pages/Faq'))
 const About = lazy(() => import('./pages/About'))
 const Terms = lazy(() => import('./pages/Terms'))
@@ -76,6 +79,8 @@ export default function App() {
                 <Route path="/order/confirm" element={<OrderConfirmation />} />
                 <Route path="/orders" element={<OrderHistory />} />
                 <Route path="/faq" element={<Faq />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
@@ -118,6 +123,7 @@ export default function App() {
                 <Route path="custom-orders" element={<AdminCustomOrders />} />
                 <Route path="notifications" element={<AdminNotifications />} />
                 <Route path="announcements" element={<AdminAnnouncements />} />
+                <Route path="blog" element={<AdminBlog />} />
                 <Route path="instagram" element={<AdminInstagram />} />
                 <Route path="reviews" element={<AdminReviews />} />
                 <Route path="subscribers" element={<AdminSubscribers />} />

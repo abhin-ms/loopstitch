@@ -12,6 +12,7 @@ import StarRating from '../components/StarRating'
 import ProductDetails from '../components/ProductDetails'
 import RecentlyViewed from '../components/RecentlyViewed'
 import { pushRecent } from '../utils/recentlyViewed'
+import { removeServerLd } from '../utils/serverLd'
 import { useWishlist } from '../context/WishlistContext'
 import { haptic } from '../utils/haptics'
 
@@ -75,6 +76,8 @@ export default function ProductDetail() {
     const schema = document.createElement('script')
     schema.type = 'application/ld+json'
     schema.dataset.loopstitchProduct = 'true'
+    schema.dataset.appLd = 'true'
+    removeServerLd('Product')
     schema.textContent = JSON.stringify({
       '@context': 'https://schema.org', '@type': 'Product', name: product.name,
       description, image: (product.colors?.[0]?.images || product.images || []).map((image) => mediaUrl(image.url)),

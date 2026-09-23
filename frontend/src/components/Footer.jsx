@@ -28,6 +28,7 @@ export default function Footer() {
           <div className="font-mono text-xs uppercase tracking-widest text-slate mb-4">Info</div>
           <ul className="space-y-2 text-sm text-paper/80">
             <li><Link to="/about" className="hover:text-acid transition-colors">About the brand</Link></li>
+            <li><Link to="/blog" className="hover:text-acid transition-colors">Journal</Link></li>
             <li><Link to="/terms" className="hover:text-acid transition-colors">Terms &amp; Conditions</Link></li>
             <li><Link to="/privacy" className="hover:text-acid transition-colors">Privacy Policy</Link></li>
             <li><Link to="/privacy#refunds" className="hover:text-acid transition-colors">Refund, Return &amp; Cancellation</Link></li>

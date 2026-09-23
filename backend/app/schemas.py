@@ -641,3 +641,28 @@ class InstagramVideoOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Blog ----------
+class BlogPostIn(BaseModel):
+    title: str = Field(min_length=3, max_length=200)
+    slug: str = Field(default="", max_length=220)
+    excerpt: str = Field(default="", max_length=300)
+    body: str = Field(default="", max_length=50000)
+    cover_url: str = Field(default="", max_length=500)
+    is_published: bool = False
+
+
+class BlogPostOut(BaseModel):
+    id: int
+    title: str
+    slug: str
+    excerpt: str
+    body: str
+    cover_url: str
+    is_published: bool
+    published_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

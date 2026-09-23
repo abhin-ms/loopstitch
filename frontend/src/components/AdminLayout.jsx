@@ -15,6 +15,7 @@ const LINKS = [
   { to: '/admin/coupons', label: 'Coupons' },
   { to: '/admin/orders', label: 'Orders' },
   { to: '/admin/instagram', label: 'Instagram' },
+  { to: '/admin/blog', label: 'Journal' },
   { to: '/admin/reviews', label: 'Reviews' },
   { to: '/admin/subscribers', label: 'Subscribers' },
   { to: '/admin/notifications', label: 'Notifications' },

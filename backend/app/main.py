@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
@@ -24,6 +24,7 @@ from .offers import compute_best_offer, get_shipping_config, set_setting, shippi
 from . import razorpay as razorpay_helper
 from . import whatsapp as whatsapp_helper
 from . import customer_auth
+from . import seo
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -2050,5 +2051,189 @@ def sitemap(db: Session = Depends(get_db)):
         stamp = (p.updated_at or p.created_at)
         lastmod = f"<lastmod>{stamp.date().isoformat()}</lastmod>" if stamp else ""
         urls.append(f"<url><loc>{SITE_URL}/product/{escape(p.slug)}</loc>{lastmod}<priority>0.8</priority></url>")
+    posts = db.query(models.BlogPost).filter(models.BlogPost.is_published == True).all()  # noqa: E712
+    if posts:
+        urls.append(f"<url><loc>{SITE_URL}/blog</loc><priority>0.6</priority></url>")
+    for post in posts:
+        stamp = post.updated_at or post.published_at
+        lastmod = f"<lastmod>{stamp.date().isoformat()}</lastmod>" if stamp else ""
+        urls.append(f"<url><loc>{SITE_URL}/blog/{escape(post.slug)}</loc>{lastmod}<priority>0.6</priority></url>")
     body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
     return Response(content=body, media_type="application/xml")
+
+
+# ============================================================
+# SERVER-RENDERED HEAD for product / journal pages (nginx routes /product/* and /blog/* here)
+# ============================================================
+def _spa_response(page: Optional[str], status_code: int = 200):
+    if page is None:
+        # No built index.html (local dev): nginx falls back to the static app shell
+        raise HTTPException(status_code=503, detail="index.html not available")
+    return HTMLResponse(page, status_code=status_code, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/render/product/{slug}", include_in_schema=False)
+def render_product(slug: str, db: Session = Depends(get_db)):
+    page = seo.load_index()
+    product = db.query(models.Product).options(*product_load_options()).filter(
+        models.Product.slug == slug, models.Product.is_active == True  # noqa: E712
+    ).first()
+    if page is None or product is None:
+        return _spa_response(page, 404)
+    return _spa_response(seo.product_page(page, product))
+
+
+@app.get("/api/render/blog/{slug}", include_in_schema=False)
+def render_blog(slug: str, db: Session = Depends(get_db)):
+    page = seo.load_index()
+    post = db.query(models.BlogPost).filter(models.BlogPost.slug == slug, models.BlogPost.is_published == True).first()  # noqa: E712
+    if page is None or post is None:
+        return _spa_response(page, 404)
+    return _spa_response(seo.blog_page(page, post))
+
+
+# ============================================================
+# GOOGLE MERCHANT CENTER FEED  (free Shopping listings)
+# ============================================================
+@app.get("/api/feed/google.xml", include_in_schema=False)
+def google_product_feed(db: Session = Depends(get_db)):
+    from xml.sax.saxutils import escape
+    products = db.query(models.Product).options(*product_load_options()).filter(models.Product.is_active == True).all()  # noqa: E712
+    items = []
+    for p in products:
+        link = f"{seo.SITE_URL}/product/{p.slug}"
+        description = seo.plain(p.meta_description or p.description or p.name, 4900)
+        on_sale = p.compare_at_price and p.compare_at_price > p.price
+        base_price = p.compare_at_price if on_sale else p.price
+        colors = list(p.colors) or [None]
+        for color in colors:
+            imgs = [i.url for i in (color.images if color else p.images) or []] or [i.url for i in p.images or []]
+            sizes = (color.sizes if color else p.sizes) or []
+            for size in sizes:
+                fields = {
+                    "g:id": f"{p.id}-{color.id if color else 0}-{size.size}",
+                    "g:item_group_id": str(p.id),
+                    "g:title": f"{p.name} – Unisex Oversized T-Shirt" + (f" – {color.name}" if color else "") + f" – {size.size}",
+                    "g:description": description,
+                    "g:link": link,
+                    "g:image_link": seo.absolute(imgs[0]) if imgs else seo.absolute(""),
+                    "g:availability": "in_stock" if size.stock > 0 else "out_of_stock",
+                    "g:price": f"{base_price:.2f} INR",
+                    "g:condition": "new",
+                    "g:brand": seo.BRAND,
+                    "g:google_product_category": "212",
+                    "g:product_type": "Unisex Oversized T-Shirts",
+                    "g:gender": "unisex",
+                    "g:age_group": "adult",
+                    "g:size": size.size,
+                    "g:identifier_exists": "no",
+                }
+                if on_sale:
+                    fields["g:sale_price"] = f"{p.price:.2f} INR"
+                if color:
+                    fields["g:color"] = color.name
+                extra = "".join(f"<g:additional_image_link>{escape(seo.absolute(u))}</g:additional_image_link>" for u in imgs[1:10])
+                items.append("<item>" + "".join(f"<{k}>{escape(v)}</{k}>" for k, v in fields.items()) + extra + "</item>")
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>'
+        f"<title>{seo.BRAND}</title><link>{seo.SITE_URL}</link><description>Unisex oversized t-shirts</description>\n"
+        + "\n".join(items) + "\n</channel></rss>\n"
+    )
+    return Response(content=body, media_type="application/xml")
+
+
+# ============================================================
+# JOURNAL / BLOG
+# ============================================================
+def _unique_blog_slug(db: Session, base: str, exclude_id: Optional[int] = None) -> str:
+    base = slugify(base) or "post"
+    slug, n = base, 1
+    while True:
+        q = db.query(models.BlogPost).filter(models.BlogPost.slug == slug)
+        if exclude_id is not None:
+            q = q.filter(models.BlogPost.id != exclude_id)
+        if not q.first():
+            return slug
+        n += 1
+        slug = f"{base}-{n}"
+
+
+def _apply_blog(row: models.BlogPost, payload: schemas.BlogPostIn, db: Session) -> None:
+    row.title = payload.title.strip()
+    row.slug = _unique_blog_slug(db, payload.slug or payload.title, row.id)
+    row.excerpt = payload.excerpt.strip()
+    row.body = payload.body.strip()
+    cover = payload.cover_url.strip()
+    row.cover_url = cover if cover.startswith("/uploads/") or cover.startswith("https://") else ""
+    if payload.is_published and not row.published_at:
+        row.published_at = _utcnow()
+    row.is_published = payload.is_published
+
+
+@app.get("/api/blog", response_model=List[schemas.BlogPostOut])
+def public_blog_list(db: Session = Depends(get_db)):
+    return db.query(models.BlogPost).filter(models.BlogPost.is_published == True).order_by(models.BlogPost.published_at.desc()).all()  # noqa: E712
+
+
+@app.get("/api/blog/{slug}", response_model=schemas.BlogPostOut)
+def public_blog_post(slug: str, db: Session = Depends(get_db)):
+    post = db.query(models.BlogPost).filter(models.BlogPost.slug == slug, models.BlogPost.is_published == True).first()  # noqa: E712
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+
+@app.get("/api/admin/blog", response_model=List[schemas.BlogPostOut])
+def admin_blog_list(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    return db.query(models.BlogPost).order_by(models.BlogPost.created_at.desc()).all()
+
+
+@app.post("/api/admin/blog", response_model=schemas.BlogPostOut)
+def admin_blog_create(payload: schemas.BlogPostIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = models.BlogPost(created_at=_utcnow())
+    _apply_blog(row, payload, db)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.put("/api/admin/blog/{post_id}", response_model=schemas.BlogPostOut)
+def admin_blog_update(post_id: int, payload: schemas.BlogPostIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.BlogPost).filter(models.BlogPost.id == post_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Post not found")
+    _apply_blog(row, payload, db)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/api/admin/blog/{post_id}")
+def admin_blog_delete(post_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    row = db.query(models.BlogPost).filter(models.BlogPost.id == post_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Post not found")
+    db.delete(row)
+    db.commit()
+    return {"detail": "Post deleted"}
+
+
+@app.post("/api/admin/blog/cover")
+async def admin_blog_cover(file: UploadFile = File(...), current: models.Admin = Depends(auth.get_current_admin)):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, WebP or GIF image.")
+    contents = b""
+    while chunk := await file.read(8192):
+        contents += chunk
+        if len(contents) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=400, detail="Image too large. Maximum size is 10 MB.")
+    fname = f"{uuid.uuid4().hex}{os.path.splitext(file.filename or '')[1] or '.jpg'}"
+    if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
+        url = gcs.upload_to_gcs(contents, fname, content_type=file.content_type)
+    else:
+        with open(os.path.join(UPLOAD_DIR, fname), "wb") as f:
+            f.write(contents)
+        url = f"/uploads/products/{fname}"
+    return {"url": url}

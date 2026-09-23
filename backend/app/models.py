@@ -399,3 +399,19 @@ class InstagramVideo(Base):
     link_url = Column(String(300), default="")   # where the Instagram label sends people (post or profile)
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=_utcnow)
+
+
+class BlogPost(Base):
+    """Journal article written in the admin (for SEO and storytelling)."""
+    __tablename__ = "blog_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    slug = Column(String(220), unique=True, index=True, nullable=False)
+    excerpt = Column(String(300), default="")          # also used as the meta description
+    body = Column(Text, default="")                    # plain text: blank line = new paragraph, "## " = heading
+    cover_url = Column(String(500), default="")
+    is_published = Column(Boolean, default=False, index=True)
+    published_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
