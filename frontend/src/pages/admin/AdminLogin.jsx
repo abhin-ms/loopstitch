@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useAdminAuth } from '../../context/AdminAuthContext'
+import useNoIndex from '../../hooks/useNoIndex'
 
 export default function AdminLogin() {
+  useNoIndex()
   const { login, isAuthenticated, loading } = useAdminAuth()
   const navigate = useNavigate()
   const location = useLocation()

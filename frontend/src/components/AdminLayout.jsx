@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import Loader from './Loader'
 import { useAdminAuth } from '../context/AdminAuthContext'
+import useNoIndex from '../hooks/useNoIndex'
 
 const LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard' },
@@ -40,6 +41,7 @@ function CloseIcon({ className }) {
 }
 
 export default function AdminLayout() {
+  useNoIndex()
   const { isAuthenticated, loading, logout, admin } = useAdminAuth()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
