@@ -18,6 +18,7 @@ export default function MobileCustomCheckout() {
 
   const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', shipping_address: '', city: '', state: '', pincode: '' })
   const [paymentMethod, setPaymentMethod] = useState('online')
+  const [acceptedNoRefund, setAcceptedNoRefund] = useState(false)
   const [codEnabled, setCodEnabled] = useState(false)
   const [razorpayKeyId, setRazorpayKeyId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -174,9 +175,20 @@ export default function MobileCustomCheckout() {
         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ls-accent)' }}>{formatINR(initialQuote?.total ?? 0)}</span>
       </div>
 
+      <div style={{ border: '2px solid var(--ls-accent)', padding: 14, marginBottom: 16 }}>
+        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ls-accent)' }}>Custom orders are final</p>
+        <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.5 }}>
+          Custom-printed tees are made to order, so they <strong>cannot be returned, exchanged or refunded</strong>, including if you cancel. If your order arrives damaged or with a printing fault on our side, we reprint it free.
+        </p>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, fontWeight: 600 }}>
+          <input type="checkbox" checked={acceptedNoRefund} onChange={(e) => setAcceptedNoRefund(e.target.checked)} style={{ width: 18, height: 18, marginTop: 1 }} />
+          I understand this custom order cannot be returned or refunded.
+        </label>
+      </div>
+
       {error && <p style={{ fontSize: 12, color: 'var(--ls-accent)', marginBottom: 14 }}>{error}</p>}
 
-      <button className="ls-btn-primary" disabled={invalid || submitting} onClick={handleSubmit}>
+      <button className="ls-btn-primary" disabled={invalid || submitting || !acceptedNoRefund} onClick={handleSubmit}>
         {submitting ? 'Placing order…' : 'Place custom order →'}
       </button>
     </div>

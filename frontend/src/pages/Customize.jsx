@@ -57,6 +57,7 @@ export default function Customize() {
     shipping_address: '', city: '', state: '', pincode: '',
   })
   const [paymentMethod, setPaymentMethod] = useState('online')
+  const [acceptedNoRefund, setAcceptedNoRefund] = useState(false)
   const [codEnabled, setCodEnabled] = useState(false)
   const [razorpayKeyId, setRazorpayKeyId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -369,11 +370,19 @@ export default function Customize() {
                   </button>}
                 </div>
               </div>
+              <div className="mt-6 border border-riot/60 bg-riot/5 p-4">
+                <p className="font-mono text-[11px] uppercase tracking-widest text-riot mb-1">Custom orders are final</p>
+                <p className="text-sm text-paper/80 leading-relaxed">Custom-printed tees are made to order from your design, so they <strong className="text-paper">cannot be returned, exchanged or refunded</strong>, including if you cancel. If your order arrives damaged or with a printing fault on our side, we reprint it free. <a href="/privacy#returns" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-acid">Return policy</a></p>
+                <label className="flex items-start gap-2.5 mt-3 cursor-pointer text-sm text-paper">
+                  <input type="checkbox" checked={acceptedNoRefund} onChange={(e) => setAcceptedNoRefund(e.target.checked)} className="mt-1 w-4 h-4 accent-[var(--color-acid)]" required />
+                  I understand this custom order cannot be returned or refunded.
+                </label>
+              </div>
               {submitError && <p className="text-riot font-mono text-xs mt-4">{submitError}</p>}
             </div>
             <PriceSummary quote={quote} quoteLoading={quoteLoading} totalPieces={selectedQuantity} />
           </div>
-          <button type="submit" disabled={submitting || !quote}
+          <button type="submit" disabled={submitting || !quote || !acceptedNoRefund}
             className="w-full mt-8 py-4 bg-acid text-ink font-mono text-xs uppercase tracking-widest hover:bg-acid/90 disabled:opacity-40 transition-colors">
             {submitting ? 'Preparing order...' : paymentMethod === 'online' ? 'Continue to Razorpay' : 'Place custom order'}
           </button>

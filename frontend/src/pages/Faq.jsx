@@ -39,6 +39,7 @@ function buildFaq(cod) {
     {
       id: 'custom', title: 'Custom prints', items: [
         ['Can I print my own design?', 'Yes. Open the custom studio, upload your artwork, logo or photo, place it on the tee and order. Every design is checked before it is printed.'],
+        ['Can I return or get a refund on a custom order?', 'No. Custom-printed orders are made to order from your design, so they cannot be returned, exchanged or refunded, including if you cancel. If a custom order arrives damaged or with a printing fault caused by us, email us within 10 days of delivery and we will reprint it free of charge.'],
         ['Is there a minimum quantity?', 'Custom orders have a minimum quantity set by our team; the custom studio shows it along with bulk discounts.'],
       ],
     },
