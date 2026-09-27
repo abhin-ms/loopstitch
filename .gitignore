@@ -31,3 +31,5 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+backend/uploads/custom/*
+backend/uploads/reels/*

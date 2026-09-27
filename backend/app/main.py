@@ -47,6 +47,28 @@ app.mount("/uploads", StaticFiles(directory=os.path.join(os.path.dirname(os.path
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
+UPLOADS_ROOT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+
+
+def store_upload(contents: bytes, fname: str, content_type: str, subdir: str) -> str:
+    """Save an uploaded file and return its public URL.
+
+    Uses Google Cloud Storage when it is configured. If that fails (wrong bucket, permissions,
+    network), the file is kept on this server instead and the error is logged, so a shopper's
+    upload is never lost because of a storage problem.
+    """
+    if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
+        try:
+            return gcs.upload_to_gcs(contents, fname, content_type=content_type)
+        except Exception:
+            logger.exception("Cloud storage upload failed for %s; saving on local disk instead", fname)
+    folder = os.path.join(UPLOADS_ROOT, subdir)
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, fname), "wb") as f:
+        f.write(contents)
+    return f"/uploads/{subdir}/{fname}"
+
+
 def _utcnow():
     return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
@@ -451,13 +473,7 @@ async def upload_product_images(
         ext = os.path.splitext(file.filename)[1] or ".jpg"
         fname = f"{uuid.uuid4().hex}{ext}"
 
-        if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
-            url = gcs.upload_to_gcs(contents, fname)
-        else:
-            path = os.path.join(UPLOAD_DIR, fname)
-            with open(path, "wb") as f:
-                f.write(contents)
-            url = f"/uploads/products/{fname}"
+        url = store_upload(contents, fname, file.content_type, "products")
 
         position = db.query(models.ProductImage).filter(
             models.ProductImage.product_id == product_id,
@@ -1384,7 +1400,7 @@ async def upload_custom_design(
 
     ext = os.path.splitext(file.filename)[1] or ".jpg"
     fname = f"custom-{uuid.uuid4().hex}{ext}"
-    url = gcs.upload_to_gcs(contents, fname)
+    url = store_upload(contents, fname, file.content_type, "custom")
     file_type = "pdf" if file.content_type == "application/pdf" else "image"
     return {"file_url": url, "file_name": file.filename, "file_type": file_type, "print_area": print_area, "notes": notes}
 
@@ -1993,12 +2009,7 @@ async def admin_upload_instagram_video(
         raise HTTPException(status_code=422, detail="The link must be an Instagram address.")
 
     fname = f"{uuid.uuid4().hex}{ext}"
-    if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
-        url = gcs.upload_to_gcs(contents, fname, content_type=file.content_type)
-    else:
-        with open(os.path.join(REELS_DIR, fname), "wb") as f:
-            f.write(contents)
-        url = f"/uploads/reels/{fname}"
+    url = store_upload(contents, fname, file.content_type, "reels")
 
     row = models.InstagramVideo(video_url=url, link_url=link, created_at=_utcnow())
     db.add(row)
@@ -2230,10 +2241,5 @@ async def admin_blog_cover(file: UploadFile = File(...), current: models.Admin =
         if len(contents) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=400, detail="Image too large. Maximum size is 10 MB.")
     fname = f"{uuid.uuid4().hex}{os.path.splitext(file.filename or '')[1] or '.jpg'}"
-    if os.getenv("GCS_BUCKET_NAME") and os.getenv("GCS_SERVICE_ACCOUNT_B64"):
-        url = gcs.upload_to_gcs(contents, fname, content_type=file.content_type)
-    else:
-        with open(os.path.join(UPLOAD_DIR, fname), "wb") as f:
-            f.write(contents)
-        url = f"/uploads/products/{fname}"
+    url = store_upload(contents, fname, file.content_type, "products")
     return {"url": url}

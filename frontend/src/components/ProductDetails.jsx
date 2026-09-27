@@ -8,7 +8,7 @@ const SECTIONS = [
       <>
         <p>Unisex, oversized cut with dropped shoulders. Made to be worn by anyone.</p>
         <p>Most people wear their usual size for the intended look. If you usually buy women&apos;s sizes, go one size down for a relaxed fit.</p>
-        <button type="button" onClick={open} className="underline underline-offset-4 hover:text-acid">Open the size guide and fit finder</button>
+        <button type="button" onClick={open} className="underline underline-offset-4 hover:text-acid py-3 -my-2 text-left">Open the size guide and fit finder</button>
       </>
     ),
   },

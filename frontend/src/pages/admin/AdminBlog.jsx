@@ -90,13 +90,13 @@ export default function AdminBlog() {
         <div>
           <span className={label}>Cover image</span>
           {form.cover_url && <img src={mediaUrl(form.cover_url)} alt="" className="w-full max-w-sm aspect-[16/9] object-cover border border-panel-2 mb-2" />}
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadCover} className="font-mono text-xs text-slate" />
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadCover} className="font-mono text-xs text-slate w-full py-2 file:mr-3 file:border file:border-panel-2 file:bg-panel file:px-4 file:py-2.5 file:font-mono file:text-xs file:uppercase file:tracking-widest file:text-paper" />
           {uploading && <p className="font-mono text-xs text-acid mt-1">Uploading…</p>}
         </div>
         <div>
           <div className="flex items-center justify-between">
             <span className={label}>Article</span>
-            <button type="button" onClick={() => setPreview((v) => !v)} className="font-mono text-[11px] uppercase tracking-widest text-slate hover:text-acid mb-1.5">{preview ? 'Edit' : 'Preview'}</button>
+            <button type="button" onClick={() => setPreview((v) => !v)} className="font-mono text-[11px] uppercase tracking-widest text-slate hover:text-acid px-3 py-3 -mr-3 -my-2">{preview ? 'Edit' : 'Preview'}</button>
           </div>
           {preview ? (
             <div className="border border-panel-2 p-4 min-h-40"><ArticleBody text={form.body} /></div>

@@ -5,3 +5,5 @@ __pycache__/
 uploads/products/*
 !uploads/products/.gitkeep
 .env
+uploads/custom/*
+uploads/reels/*

@@ -107,7 +107,7 @@ export default function AdminInstagram() {
         <form onSubmit={upload} className="border border-panel-2 p-4 space-y-3 mb-6">
           <label className="block">
             <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Video file</span>
-            <input ref={fileRef} type="file" required accept="video/mp4,video/webm,video/quicktime" className="font-mono text-xs text-slate w-full" />
+            <input ref={fileRef} type="file" required accept="video/mp4,video/webm,video/quicktime" className="font-mono text-xs text-slate w-full py-2 file:mr-3 file:border file:border-panel-2 file:bg-panel file:px-4 file:py-2.5 file:font-mono file:text-xs file:uppercase file:tracking-widest file:text-paper" />
           </label>
           <label className="block">
             <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Instagram link for the label (optional, defaults to your profile)</span>

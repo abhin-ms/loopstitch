@@ -53,9 +53,17 @@ function svgPoint(svgEl, clientX, clientY) {
   return { x: loc.x, y: loc.y }
 }
 
-function ShirtFace({ side, colorHex, canvasState, onDrag }) {
+// Keep the design's centre on the garment so it can't be dragged away and lost
+const DRAG_BOUNDS = { minX: 105, maxX: 395, minY: 60, maxY: 590 }
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+export const MIN_SCALE = 0.4
+export const MAX_SCALE = 2
+
+function ShirtFace({ side, colorHex, canvasState, onDrag, onScale }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
+  const pointers = useRef(new Map())   // active touches/mouse, for drag and two-finger pinch
+  const pinchRef = useRef(null)
   const body = side === 'front' ? BODY_FRONT : BODY_BACK
   const collar = side === 'front' ? COLLAR_FRONT : COLLAR_BACK
   const neckhole = side === 'front' ? NECKHOLE_FRONT : NECKHOLE_BACK
@@ -63,26 +71,75 @@ function ShirtFace({ side, colorHex, canvasState, onDrag }) {
   const w = s.baseW * s.scale
   const h = s.baseH * s.scale
   const placeholderFill = getLuminance(colorHex) < 0.45 ? '#ffffff' : '#000000'
+  const hasDesign = Boolean(s.dataUrl)
+
+  // Mobile browsers ignore touch-action on SVG child elements, so while a finger is moving the
+  // design we cancel the page scroll ourselves. This listener must be non-passive to be allowed to.
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return undefined
+    const stopScroll = (e) => { if (dragRef.current || pinchRef.current) e.preventDefault() }
+    el.addEventListener('touchmove', stopScroll, { passive: false })
+    return () => el.removeEventListener('touchmove', stopScroll)
+  }, [])
+
+  const distance = () => {
+    const [a, b] = [...pointers.current.values()]
+    return Math.hypot(a.x - b.x, a.y - b.y)
+  }
 
   function handlePointerDown(e) {
-    if (!s.dataUrl) return
+    if (!hasDesign) return
     const p = svgPoint(svgRef.current, e.clientX, e.clientY)
-    dragRef.current = { startX: p.x, startY: p.y, startTx: s.tx, startTy: s.ty }
-    e.currentTarget.setPointerCapture(e.pointerId)
+    pointers.current.set(e.pointerId, p)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    if (pointers.current.size === 2) {
+      // second finger down: switch from dragging to pinch-resizing
+      dragRef.current = null
+      pinchRef.current = { startDist: distance(), startScale: s.scale }
+    } else if (pointers.current.size === 1) {
+      dragRef.current = { startX: p.x, startY: p.y, startTx: s.tx, startTy: s.ty }
+    }
     e.stopPropagation()
   }
   function handlePointerMove(e) {
-    if (!dragRef.current) return
+    if (!pointers.current.has(e.pointerId)) return
     const p = svgPoint(svgRef.current, e.clientX, e.clientY)
-    onDrag(dragRef.current.startTx + (p.x - dragRef.current.startX), dragRef.current.startTy + (p.y - dragRef.current.startY))
+    pointers.current.set(e.pointerId, p)
+    if (pinchRef.current && pointers.current.size === 2) {
+      const ratio = distance() / (pinchRef.current.startDist || 1)
+      onScale(clamp(pinchRef.current.startScale * ratio, MIN_SCALE, MAX_SCALE))
+    } else if (dragRef.current) {
+      const d = dragRef.current
+      onDrag(clamp(d.startTx + (p.x - d.startX), DRAG_BOUNDS.minX, DRAG_BOUNDS.maxX), clamp(d.startTy + (p.y - d.startY), DRAG_BOUNDS.minY, DRAG_BOUNDS.maxY))
+    }
     e.stopPropagation()
   }
-  function handlePointerUp() {
-    dragRef.current = null
+  function handlePointerUp(e) {
+    pointers.current.delete(e.pointerId)
+    pinchRef.current = null
+    if (pointers.current.size === 1) {
+      // one finger lifted after a pinch: carry on dragging with the remaining finger
+      const [p] = [...pointers.current.values()]
+      dragRef.current = { startX: p.x, startY: p.y, startTx: s.tx, startTy: s.ty }
+    } else {
+      dragRef.current = null
+    }
   }
 
   return (
-    <svg ref={svgRef} viewBox="0 0 500 640" className="w-full h-full" style={{ filter: 'drop-shadow(0 18px 22px rgba(0,0,0,0.35))' }}>
+    <svg
+      ref={svgRef}
+      viewBox="0 0 500 640"
+      className="w-full h-full select-none"
+      style={{ filter: 'drop-shadow(0 18px 22px rgba(0,0,0,0.35))', touchAction: hasDesign ? 'none' : 'pan-y', cursor: hasDesign ? 'grab' : 'default', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
+      aria-label={hasDesign ? 'Design preview. Drag to move; pinch with two fingers to resize.' : 'T-shirt preview'}
+      role="img"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       <defs>
         <clipPath id={`bodyclip-${side}`}><path d={body} /></clipPath>
         <radialGradient id={`light-${side}`} cx="38%" cy="10%" r="80%">
@@ -104,14 +161,11 @@ function ShirtFace({ side, colorHex, canvasState, onDrag }) {
 
       <g
         clipPath={`url(#bodyclip-${side})`}
-        style={{ cursor: s.dataUrl ? 'grab' : 'default', touchAction: s.dataUrl ? 'none' : 'auto' }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        style={{ cursor: hasDesign ? 'grab' : 'default' }}
+        pointerEvents="none"
       >
         {s.dataUrl && (
-          <image href={s.dataUrl} x={s.tx - w / 2} y={s.ty - h / 2} width={w} height={h} />
+          <image href={s.dataUrl} x={s.tx - w / 2} y={s.ty - h / 2} width={w} height={h} preserveAspectRatio="xMidYMid meet" style={{ pointerEvents: 'all' }} draggable={false} />
         )}
       </g>
       {!s.dataUrl && (
@@ -269,10 +323,11 @@ export default function TshirtCustomizer({ colors, selections, designs, setDesig
               colorHex={previewColor?.hex_code || '#1A1A1A'}
               canvasState={s}
               onDrag={(tx, ty) => updateSide(side, { tx, ty })}
+              onScale={(scale) => updateSide(side, { scale })}
             />
           </div>
           <p className="text-center font-mono text-[10.5px] text-slate mt-3">
-            {s.dataUrl ? 'drag your design to move it' : 'upload artwork below to place it here'}
+            {s.dataUrl ? 'drag to move · pinch with two fingers or use the slider to resize' : 'upload artwork below to place it here'}
           </p>
         </div>
 
@@ -324,7 +379,7 @@ export default function TshirtCustomizer({ colors, selections, designs, setDesig
               <span className="flex justify-between font-mono text-[11px] uppercase tracking-widest text-slate mb-2">
                 <span>Size</span><span>{Math.round(s.scale * 100)}%</span>
               </span>
-              <input type="range" min="40" max="200" value={Math.round(s.scale * 100)}
+              <input type="range" min={MIN_SCALE * 100} max={MAX_SCALE * 100} step="1" value={Math.round(s.scale * 100)} aria-label="Design size" 
                 onChange={(e) => updateSide(side, { scale: Number(e.target.value) / 100 })}
                 className="w-full accent-acid" />
             </label>

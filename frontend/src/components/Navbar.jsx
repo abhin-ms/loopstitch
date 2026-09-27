@@ -58,7 +58,7 @@ export default function Navbar() {
                   key={link.label}
                   to={link.to}
                   className={
-                    `font-mono text-xs uppercase tracking-widest transition-colors ${
+                    `font-mono text-xs uppercase tracking-widest transition-colors py-3.5 ${
                       isActive ? 'text-acid' : 'text-paper/70 hover:text-paper'
                     }`
                   }
@@ -144,7 +144,7 @@ export default function Navbar() {
               </button>
             )}
 
-            <Link to="/cart" className="relative flex items-center gap-2 group" aria-label="Cart">
+            <Link to="/cart" className="relative flex items-center justify-center min-w-11 min-h-11 group" aria-label="Cart">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-paper group-hover:text-acid transition-colors">
                 <path d="M6 6h15l-1.5 9h-12z" strokeLinejoin="round" />
                 <path d="M6 6 4.5 2H2" strokeLinecap="round" />
