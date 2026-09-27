@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from . import models
 
@@ -201,33 +201,57 @@ class RazorpayVerifyRequest(BaseModel):
 
 # ---------- Coupons ----------
 class CouponBase(BaseModel):
-    code: str
-    discount_percent: float = Field(ge=1, le=100)
+    code: str = Field(min_length=2, max_length=50)
+    # percent = % off · flat = fixed ₹ off · bxgy = buy X get Y free (cheapest items free)
+    discount_type: Literal["percent", "flat", "bxgy"] = "percent"
+    discount_percent: float = Field(default=0, ge=0, le=100)
+    flat_amount: float = Field(default=0, ge=0)
+    buy_quantity: int = Field(default=0, ge=0, le=20)
+    get_quantity: int = Field(default=0, ge=0, le=20)
     max_uses: int = Field(default=0, ge=0)
     min_order: float = Field(default=0.0, ge=0)
     is_active: bool = True
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
 
+    @model_validator(mode="after")
+    def _check_type_fields(self):
+        if self.discount_type == "percent" and not (1 <= self.discount_percent <= 100):
+            raise ValueError("Percentage coupons need a discount between 1 and 100%.")
+        if self.discount_type == "flat" and self.flat_amount <= 0:
+            raise ValueError("Flat coupons need an amount greater than ₹0.")
+        if self.discount_type == "bxgy" and (self.buy_quantity < 1 or self.get_quantity < 1):
+            raise ValueError("Buy X Get Y coupons need at least 1 to buy and 1 free.")
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("The end date must be after the start date.")
+        return self
+
 
 class CouponCreate(CouponBase):
     pass
 
 
-class CouponUpdate(BaseModel):
-    code: Optional[str] = None
-    discount_percent: Optional[float] = Field(default=None, ge=1, le=100)
-    max_uses: Optional[int] = Field(default=None, ge=0)
-    min_order: Optional[float] = Field(default=None, ge=0)
-    is_active: Optional[bool] = None
+class CouponUpdate(CouponBase):
+    """Full replacement: the admin form always sends every field, so empty dates really clear."""
+    pass
+
+
+class CouponOut(BaseModel):
+    id: int
+    code: str
+    discount_type: Optional[str] = "percent"
+    discount_percent: float = 0
+    flat_amount: Optional[float] = 0
+    buy_quantity: Optional[int] = 0
+    get_quantity: Optional[int] = 0
+    max_uses: int = 0
+    min_order: float = 0
+    is_active: bool = True
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
-
-
-class CouponOut(CouponBase):
-    id: int
     times_used: int = 0
     created_at: datetime
+    label: str = ""
 
     class Config:
         from_attributes = True
@@ -241,8 +265,10 @@ class CouponValidateRequest(BaseModel):
 class CouponValidateResponse(BaseModel):
     valid: bool
     code: str = ""
+    discount_type: str = "percent"
     discount_percent: float = 0
     discount_amount: float = 0
+    label: str = ""
     message: str = ""
 
 
@@ -295,6 +321,8 @@ class QuoteOut(BaseModel):
     offer_label: str = ""
     coupon_code: str = ""
     coupon_discount: float = 0
+    coupon_label: str = ""
+    coupon_message: str = ""      # why a code didn't apply, or what to add to unlock it
     shipping_fee: float
     total: float
 
@@ -606,6 +634,7 @@ class AnnouncementOut(BaseModel):
     message: str
     detail: str
     coupon_code: str
+    coupon_label: str = ""
     link_url: str
     link_label: str
     style: str

@@ -58,7 +58,7 @@ export default function AnnouncementBar() {
         ) : item.link_url ? (
           <a href={item.link_url} target="_blank" rel="noopener noreferrer">{text}</a>
         ) : text}
-        {item.coupon_code && <CouponChip code={item.coupon_code} />}
+        {item.coupon_code && <CouponChip code={item.coupon_code} label={item.coupon_label} />}
       </div>
       <button onClick={dismiss} aria-label="Dismiss announcement" className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-lg leading-none hover:opacity-70">
         ×

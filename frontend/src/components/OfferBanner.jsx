@@ -27,7 +27,7 @@ export default function OfferBanner() {
             {item.detail && <p className="text-sm sm:text-base mt-3 max-w-xl opacity-80">{item.detail}</p>}
           </div>
           <div className="relative flex flex-wrap items-center gap-3 shrink-0">
-            {item.coupon_code && <CouponChip code={item.coupon_code} className="text-xs py-2 px-3" />}
+            {item.coupon_code && <CouponChip code={item.coupon_code} label={item.coupon_label} className="text-xs py-2 px-3" />}
             {item.link_url && (item.link_url.startsWith('/') ? (
               <Link to={item.link_url} className="bg-ink text-paper font-mono text-xs uppercase tracking-widest px-6 py-3.5 hover:opacity-80 transition-opacity">{item.link_label || 'Shop now'} →</Link>
             ) : (

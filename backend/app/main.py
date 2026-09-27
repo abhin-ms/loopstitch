@@ -20,13 +20,32 @@ from sqlalchemy import func
 
 from . import models, schemas, auth
 from .database import engine, get_db, SessionLocal
-from .offers import compute_best_offer, get_shipping_config, set_setting, shipping_fee_for, validate_coupon, apply_coupon_discount
+from .offers import compute_best_offer, get_shipping_config, set_setting, shipping_fee_for, validate_coupon, apply_coupon_discount, check_coupon, coupon_label, price_cart
 from . import razorpay as razorpay_helper
 from . import whatsapp as whatsapp_helper
 from . import customer_auth
 from . import seo
 
 models.Base.metadata.create_all(bind=engine)
+
+
+def _ensure_coupon_columns() -> None:
+    """Existing databases: add the Buy-X-Get-Y / flat-amount coupon columns if missing (safe to repeat)."""
+    import sqlalchemy as sa
+    wanted = {"discount_type": "VARCHAR(20) DEFAULT 'percent'", "flat_amount": "FLOAT DEFAULT 0",
+              "buy_quantity": "INTEGER DEFAULT 0", "get_quantity": "INTEGER DEFAULT 0"}
+    try:
+        with engine.begin() as conn:
+            existing = {c["name"] for c in sa.inspect(conn).get_columns("coupons")}
+            for name, ddl in wanted.items():
+                if name not in existing:
+                    conn.execute(sa.text(f"ALTER TABLE coupons ADD COLUMN {name} {ddl}"))
+                    logging.getLogger(__name__).info("added coupons.%s", name)
+    except Exception:
+        logging.getLogger(__name__).exception("Could not add coupon columns; run migrate.py")
+
+
+_ensure_coupon_columns()
 
 app = FastAPI(title="Loopstitch Co. API", version="1.0.0")
 
@@ -621,26 +640,26 @@ def create_order(
             "unit_price": unit_price, "product": product,
         })
 
-    # ---- Buy X Get Y (best offer wins) ----
-    best = compute_best_offer(db, cart_ctx)
-    if best:
-        order.discount_amount = best["discount"]
-        order.offer_id = best["offer_id"]
-        order.offer_label = best["label"]
-        for row in item_rows:
-            row.line_discount = round(best["line_discounts"].get((row.product_id, row.color_id, row.size), best["line_discounts"].get((row.product_id, row.size), 0.0)), 2)
-
-    # ---- Coupon (percentage off the BOGO-discounted merchandise value) ----
-    subtotal_after_bogo = round(subtotal - (order.discount_amount or 0.0), 2)
-    coupon_info = validate_coupon(db, payload.coupon_code, subtotal)
-    if coupon_info:
-        order.coupon_id = coupon_info["coupon_id"]
-        order.coupon_code = coupon_info["code"]
-        order.coupon_discount = apply_coupon_discount(subtotal_after_bogo, coupon_info)
+    # ---- Offers + coupon: same engine as the live quote, so the total always matches ----
+    priced = price_cart(db, cart_ctx, subtotal, payload.coupon_code)
+    line_discounts = {}
+    if priced["offer"]:
+        order.discount_amount = priced["offer_discount"]
+        order.offer_id = priced["offer"]["offer_id"]
+        order.offer_label = priced["offer_label"]
+        line_discounts = priced["offer"]["line_discounts"]
+    if priced["coupon"] and priced["coupon_discount"] > 0:
+        order.coupon_id = priced["coupon"].id
+        order.coupon_code = priced["coupon"].code
+        order.coupon_discount = priced["coupon_discount"]
+        line_discounts = priced["coupon_line_discounts"] or line_discounts
         # record the use (atomic increment)
-        db.query(models.Coupon).filter(models.Coupon.id == coupon_info["coupon_id"]).update(
+        db.query(models.Coupon).filter(models.Coupon.id == priced["coupon"].id).update(
             {models.Coupon.times_used: models.Coupon.times_used + 1}
         )
+    for row in item_rows:
+        row.line_discount = round(line_discounts.get((row.product_id, row.color_id, row.size), line_discounts.get((row.product_id, row.size), 0.0)), 2)
+    subtotal_after_bogo = round(subtotal - (order.discount_amount or 0.0), 2)
 
     # free-shipping judged on pre-discount subtotal (editable in admin settings)
     config = get_shipping_config(db)
@@ -688,15 +707,10 @@ def cart_quote(payload: schemas.QuoteRequest, db: Session = Depends(get_db)):
             "unit_price": product.price, "product": product,
         })
 
-    best = compute_best_offer(db, cart_ctx)
-    discount = best["discount"] if best else 0.0
-    label = best["label"] if best else ""
-
-    # ---- Coupon ----
+    priced = price_cart(db, cart_ctx, subtotal, payload.coupon_code)
+    discount = priced["offer_discount"]
+    coupon_discount = priced["coupon_discount"]
     subtotal_after_bogo = round(subtotal - discount, 2)
-    coupon_info = validate_coupon(db, payload.coupon_code, subtotal)
-    coupon_discount = apply_coupon_discount(subtotal_after_bogo, coupon_info)
-    coupon_code = coupon_info["code"] if coupon_info else ""
 
     config = get_shipping_config(db)
     fee = shipping_fee_for(subtotal, config)
@@ -704,9 +718,11 @@ def cart_quote(payload: schemas.QuoteRequest, db: Session = Depends(get_db)):
     return {
         "subtotal": round(subtotal, 2),
         "discount": round(discount, 2),
-        "offer_label": label,
-        "coupon_code": coupon_code,
+        "offer_label": priced["offer_label"],
+        "coupon_code": priced["coupon"].code if priced["coupon"] else "",
         "coupon_discount": round(coupon_discount, 2),
+        "coupon_label": priced["coupon_label"],
+        "coupon_message": priced["coupon_message"],
         "shipping_fee": round(fee, 2),
         "total": round(subtotal_after_bogo - coupon_discount + fee, 2),
     }
@@ -1189,8 +1205,8 @@ def _apply_offer_fields(offer: models.Offer, payload) -> None:
     else:
         offer.product_ids = ""
     offer.is_active = payload.is_active
-    offer.starts_at = payload.starts_at
-    offer.ends_at = payload.ends_at
+    offer.starts_at = _to_naive_utc(payload.starts_at)
+    offer.ends_at = _to_naive_utc(payload.ends_at)
 
 
 @app.get("/api/admin/offers")
@@ -1257,24 +1273,51 @@ def admin_delete_offer(offer_id: int, db: Session = Depends(get_db), current: mo
 # ============================================================
 @app.post("/api/coupons/validate", response_model=schemas.CouponValidateResponse)
 def validate_coupon_api(payload: schemas.CouponValidateRequest, db: Session = Depends(get_db)):
-    """Public endpoint: validate a coupon code and return the discount info."""
-    coupon_info = validate_coupon(db, payload.code, payload.subtotal)
-    if not coupon_info:
-        return schemas.CouponValidateResponse(valid=False, message="Invalid or expired coupon code.")
-    discount_amount = apply_coupon_discount(payload.subtotal, coupon_info)
+    """Public endpoint: check a code. Exact amounts come from /api/cart/quote, which knows the cart items."""
+    coupon, reason = check_coupon(db, payload.code, payload.subtotal)
+    if not coupon:
+        return schemas.CouponValidateResponse(valid=False, message=reason or "Enter a coupon code.")
+    kind = (coupon.discount_type or "percent")
+    amount = round(payload.subtotal * (coupon.discount_percent or 0) / 100.0, 2) if kind == "percent" else (round(min(coupon.flat_amount or 0, payload.subtotal), 2) if kind == "flat" else 0.0)
+    label = coupon_label(coupon)
     return schemas.CouponValidateResponse(
-        valid=True,
-        code=coupon_info["code"],
-        discount_percent=coupon_info["discount_percent"],
-        discount_amount=discount_amount,
-        message=f"{coupon_info['discount_percent']:.0f}% off applied!",
+        valid=True, code=coupon.code, discount_type=kind, discount_percent=coupon.discount_percent or 0,
+        discount_amount=amount, label=label, message=f"{label} applied!",
     )
+
+
+def _coupon_out(coupon: models.Coupon) -> dict:
+    data = schemas.CouponOut.model_validate(coupon).model_dump()
+    data["discount_type"] = coupon.discount_type or "percent"
+    data["label"] = coupon_label(coupon)
+    return data
+
+
+def _apply_coupon_fields(coupon: models.Coupon, payload: schemas.CouponBase) -> None:
+    coupon.code = payload.code.strip().upper()
+    coupon.discount_type = payload.discount_type
+    coupon.discount_percent = payload.discount_percent if payload.discount_type == "percent" else 0
+    coupon.flat_amount = payload.flat_amount if payload.discount_type == "flat" else 0
+    coupon.buy_quantity = payload.buy_quantity if payload.discount_type == "bxgy" else 0
+    coupon.get_quantity = payload.get_quantity if payload.discount_type == "bxgy" else 0
+    coupon.max_uses = payload.max_uses
+    coupon.min_order = payload.min_order
+    coupon.is_active = payload.is_active
+    coupon.starts_at = _to_naive_utc(payload.starts_at)
+    coupon.ends_at = _to_naive_utc(payload.ends_at)
 
 
 @app.get("/api/admin/coupons")
 def admin_list_coupons(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
-    coupons = db.query(models.Coupon).order_by(models.Coupon.created_at.desc()).all()
-    return coupons
+    return [_coupon_out(c) for c in db.query(models.Coupon).order_by(models.Coupon.created_at.desc()).all()]
+
+
+@app.get("/api/admin/coupons/{coupon_id}")
+def admin_get_coupon(coupon_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    coupon = db.query(models.Coupon).filter(models.Coupon.id == coupon_id).first()
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    return _coupon_out(coupon)
 
 
 @app.post("/api/admin/coupons")
@@ -1282,16 +1325,12 @@ def admin_create_coupon(payload: schemas.CouponCreate, db: Session = Depends(get
     code = payload.code.strip().upper()
     if db.query(models.Coupon).filter(models.Coupon.code == code).first():
         raise HTTPException(status_code=400, detail="A coupon with this code already exists.")
-    coupon = models.Coupon(
-        code=code, discount_percent=payload.discount_percent,
-        max_uses=payload.max_uses, min_order=payload.min_order,
-        is_active=payload.is_active, starts_at=payload.starts_at,
-        ends_at=payload.ends_at, created_at=_utcnow(),
-    )
+    coupon = models.Coupon(created_at=_utcnow(), times_used=0)
+    _apply_coupon_fields(coupon, payload)
     db.add(coupon)
     db.commit()
     db.refresh(coupon)
-    return coupon
+    return _coupon_out(coupon)
 
 
 @app.put("/api/admin/coupons/{coupon_id}")
@@ -1299,27 +1338,13 @@ def admin_update_coupon(coupon_id: int, payload: schemas.CouponUpdate, db: Sessi
     coupon = db.query(models.Coupon).filter(models.Coupon.id == coupon_id).first()
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
-    if payload.code is not None:
-        new_code = payload.code.strip().upper()
-        existing = db.query(models.Coupon).filter(models.Coupon.code == new_code, models.Coupon.id != coupon_id).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="A coupon with this code already exists.")
-        coupon.code = new_code
-    if payload.discount_percent is not None:
-        coupon.discount_percent = payload.discount_percent
-    if payload.max_uses is not None:
-        coupon.max_uses = payload.max_uses
-    if payload.min_order is not None:
-        coupon.min_order = payload.min_order
-    if payload.is_active is not None:
-        coupon.is_active = payload.is_active
-    if payload.starts_at is not None:
-        coupon.starts_at = payload.starts_at
-    if payload.ends_at is not None:
-        coupon.ends_at = payload.ends_at
+    new_code = payload.code.strip().upper()
+    if db.query(models.Coupon).filter(models.Coupon.code == new_code, models.Coupon.id != coupon_id).first():
+        raise HTTPException(status_code=400, detail="A coupon with this code already exists.")
+    _apply_coupon_fields(coupon, payload)
     db.commit()
     db.refresh(coupon)
-    return coupon
+    return _coupon_out(coupon)
 
 
 @app.patch("/api/admin/coupons/{coupon_id}/toggle")
@@ -1831,10 +1856,12 @@ def _to_naive_utc(value: Optional[datetime.datetime]) -> Optional[datetime.datet
     return value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
 
-def _apply_announcement(row: models.Announcement, payload: schemas.AnnouncementIn) -> None:
+def _apply_announcement(row: models.Announcement, payload: schemas.AnnouncementIn, db: Session) -> None:
     row.message = payload.message.strip()
     row.detail = payload.detail.strip()
     row.coupon_code = payload.coupon_code.strip().upper()
+    if row.coupon_code and not db.query(models.Coupon).filter(models.Coupon.code == row.coupon_code).first():
+        raise HTTPException(status_code=422, detail=f"There is no coupon called {row.coupon_code}. Create it under Coupons first, then pick it here.")
     link = payload.link_url.strip()
     # only same-site paths or https links, never javascript: URLs
     row.link_url = link if link.startswith("/") or link.startswith("https://") else ""
@@ -1850,7 +1877,18 @@ def _apply_announcement(row: models.Announcement, payload: schemas.AnnouncementI
 def public_announcements(db: Session = Depends(get_db)):
     now = _utcnow()
     rows = db.query(models.Announcement).filter(models.Announcement.is_active == True).order_by(models.Announcement.created_at.desc()).all()  # noqa: E712
-    return [r for r in rows if (r.starts_at is None or r.starts_at <= now) and (r.ends_at is None or r.ends_at >= now)]
+    out = []
+    for r in rows:
+        if (r.starts_at and r.starts_at > now) or (r.ends_at and r.ends_at < now):
+            continue
+        item = schemas.AnnouncementOut.model_validate(r).model_dump()
+        if r.coupon_code:
+            # only advertise a code that shoppers can actually use right now (min order is checked in the cart)
+            coupon, _ = check_coupon(db, r.coupon_code, float("inf"))
+            item["coupon_code"] = coupon.code if coupon else ""
+            item["coupon_label"] = coupon_label(coupon) if coupon else ""
+        out.append(item)
+    return out
 
 
 @app.get("/api/admin/announcements", response_model=List[schemas.AnnouncementOut])
@@ -1861,7 +1899,7 @@ def admin_list_announcements(db: Session = Depends(get_db), current: models.Admi
 @app.post("/api/admin/announcements", response_model=schemas.AnnouncementOut)
 def admin_create_announcement(payload: schemas.AnnouncementIn, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     row = models.Announcement(created_at=_utcnow())
-    _apply_announcement(row, payload)
+    _apply_announcement(row, payload, db)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -1873,7 +1911,7 @@ def admin_update_announcement(announcement_id: int, payload: schemas.Announcemen
     row = db.query(models.Announcement).filter(models.Announcement.id == announcement_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    _apply_announcement(row, payload)
+    _apply_announcement(row, payload, db)
     db.commit()
     db.refresh(row)
     return row

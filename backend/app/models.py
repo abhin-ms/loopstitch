@@ -147,12 +147,17 @@ class Offer(Base):
 
 
 class Coupon(Base):
-    """Percentage discount code. Validated at checkout; counts total uses."""
+    """Discount code: % off, flat ₹ off, or Buy X Get Y. Validated server-side; counts total uses."""
     __tablename__ = "coupons"
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, index=True, nullable=False)
-    discount_percent = Column(Float, nullable=False)  # e.g. 10 means 10 % off
+    discount_percent = Column(Float, nullable=False, default=0)  # e.g. 10 means 10 % off (type "percent")
+    # "percent" = % off · "flat" = fixed ₹ off · "bxgy" = buy X get Y free (cheapest items free)
+    discount_type = Column(String(20), nullable=True, default="percent", server_default="percent")
+    flat_amount = Column(Float, nullable=True, default=0, server_default="0")
+    buy_quantity = Column(Integer, nullable=True, default=0, server_default="0")
+    get_quantity = Column(Integer, nullable=True, default=0, server_default="0")
     max_uses = Column(Integer, default=0)              # 0 = unlimited
     times_used = Column(Integer, default=0)
     min_order = Column(Float, default=0.0)             # minimum subtotal to qualify

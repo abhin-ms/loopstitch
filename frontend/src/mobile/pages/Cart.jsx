@@ -3,12 +3,13 @@ import { useCart } from '../../context/CartContext'
 import { mediaUrl } from '../../api/client'
 import { formatINR } from '../../utils/format'
 import useQuote from '../../hooks/useQuote'
+import MobileCouponBox from '../components/MobileCouponBox'
 import { TrashIcon } from '../icons'
 
 export default function MobileCart() {
   const navigate = useNavigate()
-  const { items, updateQuantity, removeItem, subtotal } = useCart()
-  const quote = useQuote(items)
+  const { items, updateQuantity, removeItem, subtotal, couponCode } = useCart()
+  const quote = useQuote(items, couponCode)
 
   if (items.length === 0) {
     return (
@@ -67,12 +68,19 @@ export default function MobileCart() {
             <span style={{ fontSize: 12 }}>−{formatINR(quote.discount)}</span>
           </div>
         )}
+        {quote && quote.coupon_discount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--ls-accent)' }}>
+            <span style={{ fontSize: 12 }}>Coupon · {quote.coupon_code}</span>
+            <span style={{ fontSize: 12 }}>−{formatINR(quote.coupon_discount)}</span>
+          </div>
+        )}
         {quote && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <span style={{ fontSize: 12, color: 'var(--ls-text-muted)' }}>Delivery</span>
             <span style={{ fontSize: 12 }}>{quote.shipping_fee === 0 ? 'FREE' : formatINR(quote.shipping_fee)}</span>
           </div>
         )}
+        <MobileCouponBox quote={quote} />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <span style={{ fontSize: 13, color: 'var(--ls-text-muted)' }}>Total</span>
           <span style={{ fontSize: 15, fontWeight: 800 }}>{formatINR(quote?.total ?? subtotal)}</span>

@@ -61,7 +61,7 @@ export default function AdminCoupons() {
                   {!c.is_active && <span className="ml-2 text-[10px] text-slate">(paused)</span>}
                 </p>
                 <p className="font-mono text-[11px] text-slate mt-0.5 truncate">
-                  {c.discount_percent}% off
+                  {c.label || `${c.discount_percent}% off`}
                   {c.max_uses > 0 ? ` · ${c.times_used}/${c.max_uses} used` : ` · ${c.times_used} used`}
                   {c.min_order > 0 && ` · min ${formatINR(c.min_order)}`}
                 </p>

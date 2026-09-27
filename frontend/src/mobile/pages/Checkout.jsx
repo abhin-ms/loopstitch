@@ -5,6 +5,7 @@ import { loadRazorpay } from '../../utils/razorpay'
 import { useCart } from '../../context/CartContext'
 import { useCustomerAuth } from '../../context/CustomerAuthContext'
 import useQuote from '../../hooks/useQuote'
+import MobileCouponBox from '../components/MobileCouponBox'
 import { formatINR } from '../../utils/format'
 
 function normalizePhone(value) {
@@ -13,9 +14,9 @@ function normalizePhone(value) {
 
 export default function MobileCheckout() {
   const navigate = useNavigate()
-  const { items, subtotal, clearCart } = useCart()
+  const { items, subtotal, clearCart, couponCode } = useCart()
   const { customer, isAuthenticated, addresses, loadAddresses, addAddress } = useCustomerAuth()
-  const quote = useQuote(items)
+  const quote = useQuote(items, couponCode)
 
   const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', shipping_address: '', city: '', state: '', pincode: '' })
   const [paymentMethod, setPaymentMethod] = useState('cod')
@@ -129,6 +130,7 @@ export default function MobileCheckout() {
       const payload = {
         ...form,
         payment_method: paymentMethod,
+        coupon_code: quote?.coupon_code || couponCode || undefined,
         items: items.map((i) => ({ product_id: i.productId, color_id: i.colorId || undefined, size: i.size, quantity: i.quantity })),
       }
       const res = await client.post('/api/orders', payload)
@@ -195,6 +197,19 @@ export default function MobileCheckout() {
         </button>
       </div>
 
+      <MobileCouponBox quote={quote} />
+      {quote && quote.discount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--ls-accent)' }}>
+          <span style={{ fontSize: 12 }}>Offer · {quote.offer_label}</span>
+          <span style={{ fontSize: 12 }}>−{formatINR(quote.discount)}</span>
+        </div>
+      )}
+      {quote && quote.coupon_discount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--ls-accent)' }}>
+          <span style={{ fontSize: 12 }}>Coupon · {quote.coupon_code}</span>
+          <span style={{ fontSize: 12 }}>−{formatINR(quote.coupon_discount)}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '2px solid var(--ls-divider)', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: 'var(--ls-text-muted)' }}>Total</span>
         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ls-accent)' }}>{formatINR(total)}</span>

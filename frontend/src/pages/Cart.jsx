@@ -5,15 +5,12 @@ import { useCart } from '../context/CartContext'
 import useQuote from '../hooks/useQuote'
 import client, { mediaUrl } from '../api/client'
 import { formatINR } from '../utils/format'
+import CouponBox from '../components/CouponBox'
 
 export default function Cart() {
-  const { items, updateQuantity, removeItem, subtotal } = useCart()
+  const { items, updateQuantity, removeItem, subtotal, couponCode } = useCart()
   const navigate = useNavigate()
-  const [couponCode, setCouponCode] = useState('')
-  const [couponApplied, setCouponApplied] = useState(null) // { code, discount_percent, discount_amount, message }
-  const [couponError, setCouponError] = useState(null)
-  const [couponLoading, setCouponLoading] = useState(false)
-  const quote = useQuote(items, couponApplied?.code || '')
+  const quote = useQuote(items, couponCode)
   const [freeShipAt, setFreeShipAt] = useState(0)
 
   useEffect(() => {
@@ -30,35 +27,6 @@ export default function Cart() {
         </Link>
       </div>
     )
-  }
-
-  const handleApplyCoupon = async () => {
-    const code = couponCode.trim().toUpperCase()
-    if (!code) return
-    setCouponLoading(true)
-    setCouponError(null)
-    try {
-      const res = await client.post('/api/coupons/validate', { code, subtotal })
-      const data = res.data
-      if (data.valid) {
-        setCouponApplied(data)
-        setCouponError(null)
-      } else {
-        setCouponApplied(null)
-        setCouponError(data.message || 'Invalid coupon code.')
-      }
-    } catch {
-      setCouponError('Failed to validate coupon. Please try again.')
-      setCouponApplied(null)
-    } finally {
-      setCouponLoading(false)
-    }
-  }
-
-  const handleRemoveCoupon = () => {
-    setCouponApplied(null)
-    setCouponCode('')
-    setCouponError(null)
   }
 
   return (
@@ -137,38 +105,7 @@ export default function Cart() {
             </div>
           )}
 
-          {/* Coupon input */}
-          <div className="border-t border-panel-2 pt-3 mt-3 mb-2">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-slate mb-2">Coupon code</p>
-            {couponApplied ? (
-              <div className="flex items-center justify-between bg-acid/10 border border-acid/30 px-3 py-2">
-                <span className="font-mono text-xs text-acid">{couponApplied.code} · {couponApplied.discount_percent}% off</span>
-                <button onClick={handleRemoveCoupon} className="font-mono text-[10px] uppercase tracking-widest text-slate hover:text-riot ml-2 shrink-0">
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => { setCouponCode(e.target.value); setCouponError(null) }}
-                  placeholder="e.g. SUMMER20"
-                  className="flex-1 bg-panel border border-panel-2 px-3 py-2 text-xs font-mono text-paper placeholder:text-slate-dim focus:border-acid outline-none transition-colors"
-                />
-                <button
-                  onClick={handleApplyCoupon}
-                  disabled={couponLoading || !couponCode.trim()}
-                  className="font-mono text-[10px] uppercase tracking-widest text-acid border border-acid px-3 py-2.5 min-h-11 hover:bg-acid hover:text-ink transition-colors disabled:opacity-40 shrink-0"
-                >
-                  {couponLoading ? '…' : 'Apply'}
-                </button>
-              </div>
-            )}
-            {couponError && (
-              <p className="font-mono text-[11px] text-riot mt-1">{couponError}</p>
-            )}
-          </div>
+          <CouponBox quote={quote} />
 
           {quote && quote.coupon_discount > 0 && (
             <div className="flex justify-between text-sm text-acid mb-2">
@@ -191,7 +128,7 @@ export default function Cart() {
           )}
           <p className="font-mono text-[11px] text-slate mb-6">Final totals confirmed at checkout</p>
           <button
-            onClick={() => navigate('/checkout', { state: { couponCode: couponApplied?.code || '' } })}
+            onClick={() => navigate('/checkout')}
             className="w-full bg-riot text-ink font-mono text-sm uppercase tracking-widest px-6 py-3.5 hover:bg-acid transition-colors"
           >
             Checkout

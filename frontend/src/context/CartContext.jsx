@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 
 const CartContext = createContext(null)
 const STORAGE_KEY = 'loopstitch_cart'
+const COUPON_KEY = 'loopstitch_coupon'
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
@@ -16,6 +17,17 @@ export function CartProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
   }, [items])
+
+  // Coupon code travels with the cart (announcement -> cart -> checkout) and survives a refresh.
+  // Whether it actually applies is always decided by the server quote.
+  const [couponCode, setCouponCodeState] = useState(() => {
+    try { return localStorage.getItem(COUPON_KEY) || '' } catch { return '' }
+  })
+  const setCouponCode = (code) => {
+    const clean = (code || '').trim().toUpperCase()
+    setCouponCodeState(clean)
+    try { if (clean) localStorage.setItem(COUPON_KEY, clean); else localStorage.removeItem(COUPON_KEY) } catch { /* storage unavailable */ }
+  }
 
   const addItem = (product, color, size, quantity, maxStock) => {
     setItems((prev) => {
@@ -55,13 +67,13 @@ export function CartProvider({ children }) {
   }
 
   const removeItem = (key) => setItems((prev) => prev.filter((i) => i.key !== key))
-  const clearCart = () => setItems([])
+  const clearCart = () => { setItems([]); setCouponCode('') }
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items])
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items])
 
   return (
-    <CartContext.Provider value={{ items, addItem, updateQuantity, removeItem, clearCart, subtotal, count }}>
+    <CartContext.Provider value={{ items, addItem, updateQuantity, removeItem, clearCart, subtotal, count, couponCode, setCouponCode }}>
       {children}
     </CartContext.Provider>
   )

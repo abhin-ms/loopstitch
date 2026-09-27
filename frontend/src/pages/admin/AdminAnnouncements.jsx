@@ -35,6 +35,18 @@ export default function AdminAnnouncements() {
   const [editingId, setEditingId] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  const [coupons, setCoupons] = useState([])
+  useEffect(() => { client.get('/api/admin/coupons').then((res) => setCoupons(res.data)).catch(() => {}) }, [])
+  const couponState = (c) => {
+    const utc = (v) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(v) ? v : `${v}Z`).getTime()
+    if (!c.is_active) return 'off'
+    if (c.ends_at && utc(c.ends_at) < Date.now()) return 'expired'
+    if (c.starts_at && utc(c.starts_at) > Date.now()) return 'scheduled'
+    if (c.max_uses > 0 && c.times_used >= c.max_uses) return 'used up'
+    return ''
+  }
+  const selectedCoupon = coupons.find((c) => c.code === (form.coupon_code || '').toUpperCase())
+
   const load = () => client.get('/api/admin/announcements').then((res) => setRows(res.data)).catch(() => setError('Failed to load announcements'))
   useEffect(() => { load() }, [])
 
@@ -105,8 +117,27 @@ export default function AdminAnnouncements() {
 
         <div className="grid sm:grid-cols-2 gap-5">
           <label className="block">
-            <span className={label}>Coupon code (optional, customers tap to copy)</span>
-            <input name="coupon_code" value={form.coupon_code} onChange={set} maxLength={50} placeholder="DROP200" className={`${input} font-mono uppercase`} />
+            <span className={label}>Coupon (optional, shoppers tap it to apply)</span>
+            <select
+              name="coupon_code"
+              value={(form.coupon_code || '').toUpperCase()}
+              onChange={(e) => {
+                const code = e.target.value
+                const c = coupons.find((x) => x.code === code)
+                // empty headline? suggest one from the coupon
+                setForm((f) => ({ ...f, coupon_code: code, message: f.message || (c ? `${c.label} with code ${c.code}` : f.message) }))
+              }}
+              className={`${input} font-mono`}
+            >
+              <option value="">No coupon</option>
+              {coupons.map((c) => (
+                <option key={c.id} value={c.code}>{c.code} — {c.label}{couponState(c) ? ` (${couponState(c)})` : ''}</option>
+              ))}
+            </select>
+            {coupons.length === 0 && <span className="font-mono text-[11px] text-slate block mt-1.5">No coupons yet. Create one under Coupons first.</span>}
+            {selectedCoupon && couponState(selectedCoupon) && (
+              <span className="font-mono text-[11px] text-riot block mt-1.5">This coupon is {couponState(selectedCoupon)}, so the code won't be shown to shoppers until it's usable.</span>
+            )}
           </label>
           <label className="block">
             <span className={label}>Where it shows</span>
@@ -150,7 +181,7 @@ export default function AdminAnnouncements() {
             <span className={label}>Preview</span>
             <div className={`${STYLES[form.style]} px-4 py-2.5 text-center font-mono text-xs uppercase tracking-widest font-bold`}>
               {form.message}{form.link_url && <span className="underline underline-offset-4 ml-2">{form.link_label || 'Shop now'} →</span>}
-              {form.coupon_code && <span className="ml-3 border border-dashed border-current px-2 py-0.5">Code: {form.coupon_code.toUpperCase()}</span>}
+              {form.coupon_code && <span className="ml-3 border border-dashed border-current px-2 py-0.5">Use code {form.coupon_code.toUpperCase()}</span>}
             </div>
           </div>
         )}

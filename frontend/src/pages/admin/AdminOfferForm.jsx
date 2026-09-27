@@ -186,7 +186,7 @@ export default function AdminOfferForm() {
 
 function toLocalInput(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`)  // server stores UTC
   if (Number.isNaN(d.getTime())) return ''
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
