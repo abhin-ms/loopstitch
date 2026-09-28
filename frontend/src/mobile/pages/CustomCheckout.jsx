@@ -25,12 +25,6 @@ export default function MobileCustomCheckout() {
   const [payProcessing, setPayProcessing] = useState(false)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/app/login', { state: { redirectTo: '/app/customize' }, replace: true })
-    }
-  }, [isAuthenticated, navigate])
-
   // Razorpay is loaded on demand (no longer in index.html)
   useEffect(() => { loadRazorpay() }, [])
 
