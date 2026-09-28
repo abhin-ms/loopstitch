@@ -15,6 +15,11 @@ PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v23.0")
 
+# Template names/language exactly as approved in WhatsApp Manager (change in the server env, no code change needed)
+OTP_TEMPLATE = os.getenv("WHATSAPP_OTP_TEMPLATE", "otp_verification_5")
+ORDER_TEMPLATE = os.getenv("WHATSAPP_ORDER_TEMPLATE", "order_confirm")
+TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "en")
+
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
 
@@ -148,13 +153,13 @@ def send_otp_message(phone: str, otp_code: str) -> Dict[str, Any]:
     """
     Send an OTP verification code via WhatsApp template.
 
-    Template: otp_verification (Authentication category)
+    Template: WHATSAPP_OTP_TEMPLATE (Authentication category)
     Variables: code = 6-digit OTP code
     """
     return send_template_message(
         phone=phone,
-        template_name="otp_verification",
-        language_code="en",
+        template_name=OTP_TEMPLATE,
+        language_code=TEMPLATE_LANG,
         body_params=[otp_code],
         is_authentication=True,
     )

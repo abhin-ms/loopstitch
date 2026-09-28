@@ -1007,8 +1007,8 @@ def _send_whatsapp_notification(db: Session, order) -> None:
     try:
         result = whatsapp_helper.send_template_message(
             phone=phone_digits,
-            template_name="order_confirm",
-            language_code="en",
+            template_name=whatsapp_helper.ORDER_TEMPLATE,
+            language_code=whatsapp_helper.TEMPLATE_LANG,
             body_params=body_params,
         )
         notification.whatsapp_message_id = result.get("message_id", "")
@@ -1149,8 +1149,8 @@ def admin_resend_notification(
     try:
         result = whatsapp_helper.send_template_message(
             phone=n.customer_phone,
-            template_name="order_confirm",
-            language_code="en",
+            template_name=whatsapp_helper.ORDER_TEMPLATE,
+            language_code=whatsapp_helper.TEMPLATE_LANG,
             body_params=body_params,
         )
         n.whatsapp_message_id = result.get("message_id", "")
