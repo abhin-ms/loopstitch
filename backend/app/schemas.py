@@ -1,5 +1,5 @@
 from typing import List, Literal, Optional
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from . import models
@@ -167,8 +167,27 @@ class OrderOut(BaseModel):
     cod_advance_percent: Optional[float] = 0.0
     order_type: str = "standard"
     custom_total_pieces: Optional[int] = None
+    delhivery_awb: Optional[str] = None
+    shipment_status: Optional[str] = None
+    shipment_error: Optional[str] = None
+    pickup_date: Optional[date] = None
     created_at: datetime
     items: List[OrderItemOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+class PickupRequestOut(BaseModel):
+    id: int
+    pickup_date: date
+    pickup_time: Optional[str] = ""
+    pickup_location: Optional[str] = ""
+    expected_count: int = 0
+    status: str
+    delhivery_pickup_id: Optional[str] = ""
+    error: Optional[str] = ""
+    attempts: int = 0
 
     class Config:
         from_attributes = True

@@ -19,6 +19,16 @@ services:
       WHATSAPP_API_VERSION: v23.0
       GCS_BUCKET_NAME: loopstitch
       GCS_SERVICE_ACCOUNT_B64: ${GCS_SERVICE_ACCOUNT_B64}
+      # Delhivery — auto shipment + pickup (order date + 3 days) after payment
+      DELHIVERY_TOKEN: ${DELHIVERY_TOKEN:-}
+      DELHIVERY_PICKUP_LOCATION: ${DELHIVERY_PICKUP_LOCATION:-}
+      DELHIVERY_MODE: ${DELHIVERY_MODE:-staging}
+      DELHIVERY_AUTO: ${DELHIVERY_AUTO:-true}
+      DELHIVERY_PICKUP_AFTER_DAYS: ${DELHIVERY_PICKUP_AFTER_DAYS:-3}
+      DELHIVERY_PICKUP_TIME: ${DELHIVERY_PICKUP_TIME:-14:00:00}
+      DELHIVERY_SKIP_SUNDAY: ${DELHIVERY_SKIP_SUNDAY:-true}
+      DELHIVERY_HOLIDAYS: ${DELHIVERY_HOLIDAYS:-}
+      DELHIVERY_WEIGHT_PER_ITEM_G: ${DELHIVERY_WEIGHT_PER_ITEM_G:-350}
     volumes:
       - uploads_data:/app/backend/uploads
     restart: unless-stopped

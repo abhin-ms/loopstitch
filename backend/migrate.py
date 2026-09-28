@@ -60,6 +60,10 @@ def ensure_columns() -> None:
             models.Order.customer_id,
             models.Order.order_type,
             models.Order.custom_total_pieces,
+            models.Order.delhivery_awb,
+            models.Order.shipment_status,
+            models.Order.shipment_error,
+            models.Order.pickup_date,
         ],
         "order_items": [
             models.OrderItem.line_discount,
