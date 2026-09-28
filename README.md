@@ -142,3 +142,33 @@ This starter ships with a **cash/UPI-on-delivery style checkout** (no payment ga
 - There is intentionally **no admin signup endpoint anywhere** — the only way to create an admin account is running `seed.py` yourself
 - Uploaded product images are stored in `backend/uploads/products/` and served at `/uploads/products/...`
 - Design system: display type is Anton (poster-style headlines), body is Space Grotesk, and prices/tags/labels use JetBrains Mono — paired with a black/red/acid-yellow palette and a halftone texture nodding to manga screentone, with a scrolling "drop ticker" as the signature element
+
+---
+
+## 7. Delhivery shipping (automatic)
+
+Every order that gets paid (online, or COD with its advance) is sent to Delhivery automatically:
+
+1. **Shipment created** right after payment verification, and the AWB is saved on the order
+2. **Pickup date = order date + 3 days** (IST). Sundays and any `DELHIVERY_HOLIDAYS` are skipped
+3. **One pickup request per date.** Delhivery allows one open pickup per warehouse per day, so the first order for a date books it and later orders for that date go out with it
+4. If Delhivery refuses a pickup (for example, the date is too far ahead), it is **retried automatically every 3 hours** until the date. Admins can also press Retry
+5. Setting an order to **cancelled** in admin also cancels its Delhivery shipment
+
+Admin → Orders shows each order's AWB and pickup date, a **Label** button (the Delhivery PDF to print), **Ship / Retry ship** for failed orders, and a list of upcoming pickups.
+
+**Env vars** (in `backend/.env` or docker-compose):
+
+```
+DELHIVERY_TOKEN=xxxxxxxx                 # Delhivery One → Settings → API Setup
+DELHIVERY_PICKUP_LOCATION=LOOPSTITCH_WH  # warehouse name EXACTLY as registered in Delhivery (case-sensitive)
+DELHIVERY_MODE=staging                   # switch to "live" after testing
+DELHIVERY_AUTO=true                      # false = only ship when you press "Ship" in admin
+DELHIVERY_PICKUP_AFTER_DAYS=3
+DELHIVERY_PICKUP_TIME=14:00:00
+DELHIVERY_SKIP_SUNDAY=true
+DELHIVERY_HOLIDAYS=2026-10-20,2026-11-08
+DELHIVERY_WEIGHT_PER_ITEM_G=350          # packed weight per tee, in grams
+```
+
+The code is in `backend/app/delhivery.py`. The new DB columns and table are added automatically on startup, or you can run `python migrate.py`.

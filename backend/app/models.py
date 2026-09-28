@@ -1,7 +1,7 @@
 import datetime
 import enum
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum,
+    Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey, Text, Enum,
     UniqueConstraint, Index
 )
 from sqlalchemy.orm import relationship
@@ -198,6 +198,11 @@ class Order(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     order_type = Column(Enum(OrderType), default=OrderType.standard, index=True)
     custom_total_pieces = Column(Integer, nullable=True)
+    # ---- Delhivery shipping (auto-created after payment) ----
+    delhivery_awb = Column(String(40), nullable=True, index=True)
+    shipment_status = Column(String(20), nullable=True)   # creating / created / failed / cancelled
+    shipment_error = Column(Text, nullable=True)
+    pickup_date = Column(Date, nullable=True, index=True)  # order date (IST) + N days
     created_at = Column(DateTime, default=_utcnow)
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -224,6 +229,24 @@ class OrderItem(Base):
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
+
+
+class PickupRequest(Base):
+    """One Delhivery pickup request per date (Delhivery allows one open pickup per warehouse per day).
+    Every order shipped for that date rides on the same pickup."""
+    __tablename__ = "pickup_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pickup_date = Column(Date, unique=True, index=True, nullable=False)
+    pickup_time = Column(String(8), default="14:00:00")
+    pickup_location = Column(String(150), default="")
+    expected_count = Column(Integer, default=0)
+    status = Column(String(20), default="queued", index=True)  # queued / scheduled / failed
+    delhivery_pickup_id = Column(String(60), default="")
+    error = Column(Text, default="")
+    attempts = Column(Integer, default=0)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class Notification(Base):

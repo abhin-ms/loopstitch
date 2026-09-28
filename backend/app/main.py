@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request, status
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, HTMLResponse
@@ -23,6 +23,7 @@ from .database import engine, get_db, SessionLocal
 from .offers import compute_best_offer, get_shipping_config, set_setting, shipping_fee_for, validate_coupon, apply_coupon_discount, check_coupon, coupon_label, price_cart
 from . import razorpay as razorpay_helper
 from . import whatsapp as whatsapp_helper
+from . import delhivery
 from . import customer_auth
 from . import seo
 
@@ -46,6 +47,25 @@ def _ensure_coupon_columns() -> None:
 
 
 _ensure_coupon_columns()
+
+
+def _ensure_delhivery_columns() -> None:
+    """Existing databases: add the Delhivery shipping columns on orders if missing (safe to repeat)."""
+    import sqlalchemy as sa
+    wanted = {"delhivery_awb": "VARCHAR(40) NULL", "shipment_status": "VARCHAR(20) NULL",
+              "shipment_error": "TEXT NULL", "pickup_date": "DATE NULL"}
+    try:
+        with engine.begin() as conn:
+            existing = {c["name"] for c in sa.inspect(conn).get_columns("orders")}
+            for name, ddl in wanted.items():
+                if name not in existing:
+                    conn.execute(sa.text(f"ALTER TABLE orders ADD COLUMN {name} {ddl}"))
+                    logging.getLogger(__name__).info("added orders.%s", name)
+    except Exception:
+        logging.getLogger(__name__).exception("Could not add Delhivery columns; run migrate.py")
+
+
+_ensure_delhivery_columns()
 
 app = FastAPI(title="Loopstitch Co. API", version="1.0.0")
 
@@ -798,14 +818,114 @@ def admin_list_orders(db: Session = Depends(get_db), current: models.Admin = Dep
 
 
 @app.patch("/api/admin/orders/{order_id}/status", response_model=schemas.OrderOut)
-def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     order.status = payload.status
     db.commit()
     db.refresh(order)
+    # Cancelling an order also cancels its Delhivery shipment so the agent doesn't collect it
+    if payload.status == models.OrderStatus.cancelled and order.delhivery_awb and order.shipment_status == "created":
+        background_tasks.add_task(delhivery.cancel_in_background, order.id)
     return order
+
+
+# ============================================================
+# DELHIVERY  (auto shipment + pickup; admin controls)
+# ============================================================
+def _admin_order(db: Session, order_id: int) -> models.Order:
+    order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
+
+def _require_delhivery():
+    if not delhivery.is_configured():
+        raise HTTPException(status_code=400, detail="Delhivery is not configured. Set DELHIVERY_TOKEN and DELHIVERY_PICKUP_LOCATION.")
+
+
+@app.get("/api/admin/delhivery/status")
+def admin_delhivery_status(current: models.Admin = Depends(auth.get_current_admin)):
+    return delhivery.config_summary()
+
+
+@app.post("/api/admin/orders/{order_id}/delhivery/ship", response_model=schemas.OrderOut)
+def admin_delhivery_ship(order_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Create (or retry) the shipment + pickup for one order."""
+    _require_delhivery()
+    order = _admin_order(db, order_id)
+    if order.status not in (models.OrderStatus.paid, models.OrderStatus.shipped):
+        raise HTTPException(status_code=400, detail="Only paid orders can be shipped.")
+    delhivery.ship_order(db, order.id, force=True)
+    db.expire_all()
+    order = _admin_order(db, order_id)
+    if order.shipment_status == "failed":
+        raise HTTPException(status_code=502, detail=f"Delhivery: {order.shipment_error}")
+    return order
+
+
+@app.post("/api/admin/orders/{order_id}/delhivery/cancel", response_model=schemas.OrderOut)
+def admin_delhivery_cancel(order_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    _require_delhivery()
+    _admin_order(db, order_id)
+    ok, error = delhivery.cancel_order_shipment(db, order_id)
+    if not ok:
+        raise HTTPException(status_code=502, detail=f"Delhivery: {error}")
+    db.expire_all()
+    return _admin_order(db, order_id)
+
+
+@app.get("/api/admin/orders/{order_id}/delhivery/label")
+def admin_delhivery_label(order_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Returns the Delhivery shipping-label PDF link for printing."""
+    _require_delhivery()
+    order = _admin_order(db, order_id)
+    if not order.delhivery_awb:
+        raise HTTPException(status_code=400, detail="This order has no AWB yet.")
+    link, error = delhivery.api_label_link(order.delhivery_awb)
+    if not link:
+        raise HTTPException(status_code=502, detail=f"Delhivery: {error}")
+    return {"url": link, "awb": order.delhivery_awb}
+
+
+@app.get("/api/admin/delhivery/pickups", response_model=List[schemas.PickupRequestOut])
+def admin_delhivery_pickups(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Pickups from 7 days ago onwards, soonest first."""
+    since = delhivery.today_ist() - datetime.timedelta(days=7)
+    return db.query(models.PickupRequest).filter(models.PickupRequest.pickup_date >= since).order_by(models.PickupRequest.pickup_date.asc()).all()
+
+
+@app.post("/api/admin/delhivery/pickups/{pickup_id}/retry", response_model=schemas.PickupRequestOut)
+def admin_delhivery_retry_pickup(pickup_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    _require_delhivery()
+    row = db.query(models.PickupRequest).filter(models.PickupRequest.id == pickup_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Pickup not found")
+    if row.pickup_date < delhivery.today_ist():
+        raise HTTPException(status_code=400, detail="That pickup date has already passed.")
+    row.status = "queued"
+    db.commit()
+    return delhivery.ensure_pickup(db, row.pickup_date)
+
+
+@app.on_event("startup")
+async def _start_delhivery_pickup_retry_loop():
+    """Every 3 hours, re-submit pickups Delhivery refused earlier (e.g. booked too far ahead)."""
+    import asyncio
+
+    async def loop():
+        await asyncio.sleep(60)
+        while True:
+            try:
+                await asyncio.to_thread(delhivery.retry_due_pickups)
+            except Exception:
+                logger.exception("Delhivery retry loop error")
+            await asyncio.sleep(3 * 60 * 60)
+
+    if delhivery.is_configured():
+        asyncio.create_task(loop())
 
 
 @app.get("/api/admin/orders/{order_id}/invoice")
@@ -907,7 +1027,7 @@ def razorpay_create_order(payload: schemas.RazorpayOrderRequest):
 
 
 @app.post("/api/razorpay/verify")
-def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session = Depends(get_db)):
+def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Verify Razorpay payment signature and mark the order as paid."""
     if not payload.razorpay_order_id or not payload.razorpay_payment_id or not payload.razorpay_signature:
         raise HTTPException(status_code=400, detail="Missing payment verification fields")
@@ -942,6 +1062,10 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session 
 
     # Send WhatsApp order confirmation after successful payment
     _send_whatsapp_notification(db, order)
+
+    # Auto-create the Delhivery shipment + pickup (order date + N days) without slowing the customer down
+    if delhivery.auto_enabled():
+        background_tasks.add_task(delhivery.ship_order_in_background, order.id)
 
     return {"verified": True, "status": order.status.value}
 
