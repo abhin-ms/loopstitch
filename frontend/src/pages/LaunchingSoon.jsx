@@ -31,8 +31,8 @@ function Countdown({ date }) {
   return (
     <div className="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-md" aria-label="Time until launch">
       {Object.entries(left).map(([label, value]) => (
-        <div key={label} className="border border-panel-2 bg-panel/80 py-3 text-center">
-          <div className="font-display text-3xl sm:text-4xl text-paper tabular-nums">{String(value).padStart(2, '0')}</div>
+        <div key={label} className="border border-panel-2 bg-panel/80 py-2 sm:py-3 text-center">
+          <div className="font-display text-2xl sm:text-4xl text-paper tabular-nums">{String(value).padStart(2, '0')}</div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-slate mt-1">{label}</div>
         </div>
       ))}
@@ -46,7 +46,7 @@ function LaunchVideo() {
   return (
     <video
       src="/launch-video.mp4"
-      className="launch-video block w-full max-w-2xl aspect-video object-cover pointer-events-none select-none"
+      className="launch-video block h-[26dvh] w-auto max-w-full sm:h-auto sm:w-full sm:max-w-2xl aspect-video object-cover pointer-events-none select-none"
       autoPlay
       muted
       loop
@@ -76,34 +76,34 @@ export default function LaunchingSoon({ date = '', message = '' }) {
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col bg-ink overflow-hidden relative">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-ink overflow-hidden relative">
       <div className="screentone absolute inset-0" aria-hidden="true" />
       <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-riot/20 blur-3xl" aria-hidden="true" />
       <div className="absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-acid/10 blur-3xl" aria-hidden="true" />
 
-      <header className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-5">
+      <header className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-5">
         <div className="flex items-center gap-3">
-          <img src="/logo-dark.webp" alt="Loopstitch" width="256" height="256" className="h-10 w-10 object-contain" />
-          <span className="font-display text-xl text-paper">LOOPSTITCH<span className="text-riot">.</span></span>
+          <img src="/logo-dark.webp" alt="Loopstitch" width="256" height="256" className="h-8 w-8 sm:h-10 sm:w-10 object-contain" />
+          <span className="font-display text-lg sm:text-xl text-paper">LOOPSTITCH<span className="text-riot">.</span></span>
         </div>
-        <span className="font-mono text-[11px] uppercase tracking-widest text-acid flex items-center gap-1.5">
+        <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-widest text-acid flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-acid launch-dot" /> Sewing in progress
         </span>
       </header>
 
-      <main className="relative z-10 flex-1 grid lg:grid-cols-2 items-center gap-6 lg:gap-10 px-4 sm:px-8 max-w-6xl w-full mx-auto py-6">
-        <div className="order-2 lg:order-1 flex flex-col items-center lg:items-start text-center lg:text-left gap-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-riot">
+      <main className="relative z-10 flex-1 grid lg:grid-cols-2 items-center content-center gap-2 sm:gap-6 lg:gap-10 px-4 sm:px-8 max-w-6xl w-full mx-auto py-2 sm:py-6">
+        <div className="order-2 lg:order-1 flex flex-col items-center lg:items-start text-center lg:text-left gap-3 sm:gap-6">
+          <p className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-riot">
             ✦ Something stylish is being stitched
           </p>
-          <h1 className="launch-title font-display text-5xl sm:text-7xl text-paper leading-none" aria-label={TITLE}>
+          <h1 className="launch-title font-display text-4xl sm:text-7xl text-paper leading-none" aria-label={TITLE}>
             {TITLE.split('').map((ch, i) => (
               <span key={i} aria-hidden="true" style={{ animationDelay: `${i * 0.08}s` }} className={i >= 10 ? 'text-riot' : ''}>
                 {ch === ' ' ? ' ' : ch}
               </span>
             ))}
           </h1>
-          <p className="text-paper/80 text-base sm:text-lg max-w-md">
+          <p className="text-paper/80 text-sm sm:text-lg max-w-md">
             {message || 'Our first drop of unisex oversized anime tees is almost ready. Leave your email or WhatsApp number and be the first to know when we go live.'}
           </p>
 
@@ -118,19 +118,19 @@ export default function LaunchingSoon({ date = '', message = '' }) {
         </div>
       </main>
 
-      <div className="relative z-10 border-y border-panel-2 bg-riot text-ink py-2 overflow-hidden" aria-hidden="true">
+      <div className="relative z-10 border-y border-panel-2 bg-riot text-ink py-1.5 sm:py-2 overflow-hidden" aria-hidden="true">
         <div className="launch-marquee">
           {[0, 1].map((n) => (
             <div key={n} className="flex shrink-0">
               {MARQUEE.concat(MARQUEE).map((t, i) => (
-                <span key={i} className="font-display uppercase text-lg px-6 whitespace-nowrap">{t} ✦</span>
+                <span key={i} className="font-display uppercase text-base sm:text-lg px-5 sm:px-6 whitespace-nowrap">{t} ✦</span>
               ))}
             </div>
           ))}
         </div>
       </div>
 
-      <footer className="relative z-10 text-center font-mono text-[11px] text-slate py-4">
+      <footer className="relative z-10 text-center font-mono text-[11px] text-slate py-2 sm:py-4">
         © {new Date().getFullYear()} Loopstitch Co.
       </footer>
     </div>
