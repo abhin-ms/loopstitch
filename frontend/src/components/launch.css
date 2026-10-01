@@ -1,4 +1,22 @@
 /* ---------- Launching soon page ---------- */
+/* Phones/tablets: exactly one visible screen (dvh excludes the browser's
+   address bar; vh is the fallback for old browsers). The video area shrinks
+   to fit, so nothing below it gets pushed off-screen. */
+.launch-page {
+  height: 100vh;
+  height: 100dvh;
+}
+@media (min-width: 1024px) {
+  .launch-page {
+    height: auto;
+    min-height: 100vh;
+  }
+}
+/* Very short phone screens: drop the small extras before anything gets cramped */
+@media (max-width: 1023px) and (max-height: 620px) {
+  .launch-short-hide { display: none; }
+}
+
 /* Soft oval fade so the video's edges dissolve into the page background */
 .launch-video {
   -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);

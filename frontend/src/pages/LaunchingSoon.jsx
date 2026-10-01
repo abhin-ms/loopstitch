@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import NewsletterForm from '../components/NewsletterForm'
 import SocialLinks from '../components/SocialLinks'
 import '../components/launch.css'
+// Imported (not served from /public) so every build gives it a content-hashed URL:
+// replacing the video changes the URL, so Cloudflare/browser caches can't serve the old one
+import launchVideo from '../assets/launch-video.mp4'
 
 const TITLE = 'LAUNCHING SOON'
 const MARQUEE = ['Oversized anime tees', 'Stitched with love', 'S · M · L · XL', 'First drop loading', 'Custom prints']
@@ -45,8 +48,8 @@ function Countdown({ date }) {
 function LaunchVideo() {
   return (
     <video
-      src="/launch-video.mp4"
-      className="launch-video block h-[26dvh] w-auto max-w-full sm:h-auto sm:w-full sm:max-w-2xl aspect-video object-cover pointer-events-none select-none"
+      src={launchVideo}
+      className="launch-video h-full w-auto max-w-full aspect-video object-cover lg:h-auto lg:w-full lg:max-w-2xl pointer-events-none select-none"
       autoPlay
       muted
       loop
@@ -76,7 +79,7 @@ export default function LaunchingSoon({ date = '', message = '' }) {
   }, [])
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-ink overflow-hidden relative">
+    <div className="launch-page flex flex-col bg-ink overflow-hidden relative">
       <div className="screentone absolute inset-0" aria-hidden="true" />
       <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-riot/20 blur-3xl" aria-hidden="true" />
       <div className="absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-acid/10 blur-3xl" aria-hidden="true" />
@@ -91,9 +94,9 @@ export default function LaunchingSoon({ date = '', message = '' }) {
         </span>
       </header>
 
-      <main className="relative z-10 flex-1 grid lg:grid-cols-2 items-center content-center gap-2 sm:gap-6 lg:gap-10 px-4 sm:px-8 max-w-6xl w-full mx-auto py-2 sm:py-6">
-        <div className="order-2 lg:order-1 flex flex-col items-center lg:items-start text-center lg:text-left gap-3 sm:gap-6">
-          <p className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-riot">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-2 lg:items-center gap-3 sm:gap-6 lg:gap-10 px-4 sm:px-8 max-w-6xl w-full mx-auto py-2 sm:py-6">
+        <div className="order-2 lg:order-1 shrink-0 flex flex-col items-center lg:items-start text-center lg:text-left gap-3 sm:gap-6">
+          <p className="launch-short-hide font-mono text-[10px] sm:text-xs uppercase tracking-widest text-riot">
             ✦ Something stylish is being stitched
           </p>
           <h1 className="launch-title font-display text-4xl sm:text-7xl text-paper leading-none" aria-label={TITLE}>
@@ -113,7 +116,8 @@ export default function LaunchingSoon({ date = '', message = '' }) {
           <SocialLinks />
         </div>
 
-        <div className="order-1 lg:order-2 flex justify-center">
+        {/* phones: takes whatever height is left, so the page never scrolls */}
+        <div className="order-1 lg:order-2 flex-1 min-h-0 flex justify-center items-center lg:flex-none">
           <LaunchVideo />
         </div>
       </main>
@@ -130,7 +134,7 @@ export default function LaunchingSoon({ date = '', message = '' }) {
         </div>
       </div>
 
-      <footer className="relative z-10 text-center font-mono text-[11px] text-slate py-2 sm:py-4">
+      <footer className="launch-short-hide relative z-10 text-center font-mono text-[11px] text-slate py-2 sm:py-4">
         © {new Date().getFullYear()} Loopstitch Co.
       </footer>
     </div>
