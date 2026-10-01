@@ -333,6 +333,9 @@ class SettingsOut(BaseModel):
     free_shipping_threshold: float
     cod_advance_percent: float = 10.0
     cod_enabled: bool = False
+    launch_mode: bool = False
+    launch_date: str = ""         # ISO datetime for the countdown, "" = no countdown
+    launch_message: str = ""
 
 
 class SettingsUpdate(BaseModel):
@@ -340,6 +343,15 @@ class SettingsUpdate(BaseModel):
     free_shipping_threshold: Optional[float] = Field(default=None, ge=0)
     cod_advance_percent: Optional[float] = Field(default=None, ge=0, le=100)
     cod_enabled: Optional[bool] = None
+    launch_mode: Optional[bool] = None
+    launch_date: Optional[str] = Field(default=None, max_length=40)
+    launch_message: Optional[str] = Field(default=None, max_length=200)
+
+
+class PublicLaunchSettings(BaseModel):
+    launch_mode: bool
+    launch_date: str = ""
+    launch_message: str = ""
 
 
 class PublicShippingSettings(BaseModel):

@@ -3,15 +3,45 @@ import client from '../../api/client'
 import Loader from '../../components/Loader'
 import { formatINR } from '../../utils/format'
 
+// launch_date is stored as UTC ISO; <input type="datetime-local"> wants local "YYYY-MM-DDTHH:mm"
+function toLocalInput(iso) {
+  const d = new Date(iso)
+  if (!iso || Number.isNaN(d.getTime())) return ''
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+function toIso(local) {
+  return local ? new Date(local).toISOString() : ''
+}
+const fromApi = (data) => ({ ...data, launch_date: toLocalInput(data.launch_date) })
+
 export default function AdminSettings() {
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    client.get('/api/admin/settings').then((res) => setForm(res.data)).catch(() => setError('Failed to load settings'))
+    client.get('/api/admin/settings').then((res) => setForm(fromApi(res.data))).catch(() => setError('Failed to load settings'))
   }, [])
+
+  // Launch mode saves on click so the site flips immediately
+  const toggleLaunchMode = async () => {
+    setToggling(true)
+    setError(null)
+    try {
+      const res = await client.patch('/api/admin/settings', {
+        launch_mode: !form.launch_mode,
+        launch_date: toIso(form.launch_date),
+        launch_message: form.launch_message || '',
+      })
+      setForm(fromApi(res.data))
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update launch mode.')
+    } finally {
+      setToggling(false)
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -31,8 +61,10 @@ export default function AdminSettings() {
         razorpay_key_secret: form.razorpay_key_secret || '',
         cod_advance_percent: Number(form.cod_advance_percent),
         cod_enabled: form.cod_enabled,
+        launch_date: toIso(form.launch_date),
+        launch_message: form.launch_message || '',
       })
-      setForm(res.data)
+      setForm(fromApi(res.data))
       setSaved(true)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save settings.')
@@ -49,6 +81,52 @@ export default function AdminSettings() {
       <h1 className="font-display text-2xl sm:text-3xl uppercase text-paper mb-8">Store settings</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Launching soon page */}
+        <div className={`border p-6 space-y-5 ${form.launch_mode ? 'border-acid' : 'border-panel-2'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="font-mono text-xs uppercase tracking-widest text-acid">Launching soon page</h2>
+              <p className="font-mono text-[11px] text-slate mt-1.5">
+                {form.launch_mode
+                  ? 'ENABLED — visitors only see the launching soon page. You still see the full site while logged in as admin.'
+                  : 'DISABLED — the full store is live for everyone.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleLaunchMode}
+              disabled={toggling}
+              className={`shrink-0 font-mono text-sm uppercase tracking-widest px-6 py-3 border transition-colors disabled:opacity-60 ${
+                form.launch_mode
+                  ? 'bg-acid border-acid text-ink hover:bg-transparent hover:text-acid'
+                  : 'border-panel-2 text-paper hover:border-acid hover:text-acid'
+              }`}
+            >
+              {toggling ? 'Saving…' : form.launch_mode ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+          <label className="block">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Launch date &amp; time (optional — shows a countdown)</span>
+            <input
+              name="launch_date" type="datetime-local"
+              value={form.launch_date || ''} onChange={handleChange}
+              className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono"
+            />
+          </label>
+          <label className="block">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Message (optional)</span>
+            <textarea
+              name="launch_message" rows="3" maxLength={200}
+              value={form.launch_message || ''} onChange={handleChange}
+              placeholder="Our first drop of unisex oversized anime tees is almost ready…"
+              className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono"
+            />
+          </label>
+          <a href="/?preview-launch" target="_blank" rel="noopener noreferrer" className="inline-block font-mono text-[11px] uppercase tracking-widest text-acid underline">
+            Preview launching soon page ↗
+          </a>
+        </div>
+
         {/* Delivery charges */}
         <div className="border border-panel-2 p-6 space-y-5">
           <h2 className="font-mono text-xs uppercase tracking-widest text-acid">Delivery charges</h2>

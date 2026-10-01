@@ -840,6 +840,20 @@ def _build_settings_out(db: Session) -> schemas.SettingsOut:
         free_shipping_threshold=float(raw.get("free_shipping_threshold", 1000)),
         cod_advance_percent=float(raw.get("cod_advance_percent", "10")),
         cod_enabled=raw.get("cod_enabled", "false") == "true",
+        launch_mode=raw.get("launch_mode", "false") == "true",
+        launch_date=raw.get("launch_date", ""),
+        launch_message=raw.get("launch_message", ""),
+    )
+
+
+@app.get("/api/settings/launch", response_model=schemas.PublicLaunchSettings)
+def public_launch_settings(db: Session = Depends(get_db)):
+    # When launch_mode is on the storefront shows only the "launching soon" page
+    raw = _get_all_settings(db)
+    return schemas.PublicLaunchSettings(
+        launch_mode=raw.get("launch_mode", "false") == "true",
+        launch_date=raw.get("launch_date", ""),
+        launch_message=raw.get("launch_message", ""),
     )
 
 
@@ -873,6 +887,12 @@ def admin_update_settings(payload: schemas.SettingsUpdate, db: Session = Depends
         set_setting(db, "cod_advance_percent", str(round(float(payload.cod_advance_percent), 1)))
     if payload.cod_enabled is not None:
         set_setting(db, "cod_enabled", "true" if payload.cod_enabled else "false")
+    if payload.launch_mode is not None:
+        set_setting(db, "launch_mode", "true" if payload.launch_mode else "false")
+    if payload.launch_date is not None:
+        set_setting(db, "launch_date", payload.launch_date.strip())
+    if payload.launch_message is not None:
+        set_setting(db, "launch_message", payload.launch_message.strip())
     db.commit()
     return _build_settings_out(db)
 

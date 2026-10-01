@@ -1,0 +1,47 @@
+/* ---------- Launching soon page ---------- */
+/* Soft oval fade so the video's edges dissolve into the page background */
+.launch-video {
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
+}
+.launch-video::-webkit-media-controls,
+.launch-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
+
+.launch-marquee {
+  display: flex;
+  width: max-content;
+  animation: launch-marquee 22s linear infinite;
+}
+@keyframes launch-marquee {
+  to { transform: translateX(-50%); }
+}
+
+.launch-title span {
+  display: inline-block;
+  animation: launch-letter 2.8s ease-in-out infinite;
+}
+@keyframes launch-letter {
+  0%, 100% { transform: translateY(0); }
+  15% { transform: translateY(-8px); }
+  30% { transform: translateY(0); }
+}
+
+.launch-dot {
+  animation: launch-dot 1.4s infinite;
+}
+.launch-dot:nth-child(2) { animation-delay: 0.2s; }
+.launch-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes launch-dot {
+  0%, 60%, 100% { opacity: 0.2; }
+  30% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-marquee,
+  .launch-title span,
+  .launch-dot {
+    animation: none !important;
+  }
+}

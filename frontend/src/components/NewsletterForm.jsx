@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import client from '../api/client'
 
-export default function NewsletterForm({ source = 'home' }) {
+const THANKS = 'We will notify you soon. Thank you for subscribing!'
+
+// forgiving: show the thank-you message even if saving fails (used on the launching soon page for now)
+export default function NewsletterForm({ source = 'home', forgiving = false }) {
   const [contact, setContact] = useState('')
   const [status, setStatus] = useState({ state: 'idle', message: '' })
 
@@ -13,13 +16,18 @@ export default function NewsletterForm({ source = 'home' }) {
       setStatus({ state: 'done', message: res.data.detail })
       setContact('')
     } catch (err) {
+      if (forgiving) {
+        setStatus({ state: 'done', message: THANKS })
+        setContact('')
+        return
+      }
       const detail = err.response?.data?.detail
       setStatus({ state: 'error', message: typeof detail === 'string' ? detail : 'Something went wrong. Please try again.' })
     }
   }
 
   if (status.state === 'done') {
-    return <p className="font-mono text-sm text-acid" role="status">✓ {status.message}</p>
+    return <p className={`font-mono text-sm ${forgiving ? 'text-emerald-400' : 'text-acid'}`} role="status">✓ {status.message}</p>
   }
 
   return (

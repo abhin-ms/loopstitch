@@ -191,6 +191,7 @@ def seed_settings() -> None:
         "cod_advance_percent": "10",
         "cod_enabled": "false",
         "whatsapp_enabled": "true",
+        "launch_mode": "false",
     }
     db = SessionLocal()
     try:

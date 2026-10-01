@@ -9,6 +9,7 @@ import Loader from './components/Loader'
 import PublicLayout from './components/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import ScrollToTop from './components/ScrollToTop'
+import LaunchGate from './components/LaunchGate'
 
 const Home = lazy(() => import('./pages/Home'))
 const Shop = lazy(() => import('./pages/Shop'))
@@ -68,6 +69,8 @@ export default function App() {
             <ScrollToTop />
             <Suspense fallback={<Loader label="Loading" />}>
             <Routes>
+              {/* Storefront + mobile app sit behind the "launching soon" switch */}
+              <Route element={<LaunchGate />}>
               {/* Public storefront */}
               <Route element={<PublicLayout />}>
                 <Route path="/" element={<Home />} />
@@ -101,6 +104,7 @@ export default function App() {
                 <Route path="account" element={<MobileAccount />} />
                 <Route path="login" element={<MobileLogin />} />
                 <Route path="*" element={<Navigate to="/app" replace />} />
+              </Route>
               </Route>
 
               {/* Hidden admin area */}
