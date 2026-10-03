@@ -1,7 +1,7 @@
 import datetime
 import enum
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum,
+    Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey, Text, Enum,
     UniqueConstraint, Index
 )
 from sqlalchemy.orm import relationship
@@ -198,6 +198,15 @@ class Order(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     order_type = Column(Enum(OrderType), default=OrderType.standard, index=True)
     custom_total_pieces = Column(Integer, nullable=True)
+    # Courier (Delhivery) — pickup_date is set when payment is confirmed
+    # (+3 days standard / +5 days custom); the daily job books it and fills awb
+    pickup_date = Column(Date, nullable=True, index=True)
+    courier_name = Column(String(50), default="")
+    awb = Column(String(50), default="", index=True)  # courier tracking id
+    pickup_request_id = Column(String(50), default="")
+    courier_status = Column(String(80), default="")
+    courier_error = Column(Text, nullable=True)
+    shipped_msg_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")

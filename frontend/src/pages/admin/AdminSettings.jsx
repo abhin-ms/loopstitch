@@ -63,6 +63,13 @@ export default function AdminSettings() {
         cod_enabled: form.cod_enabled,
         launch_date: toIso(form.launch_date),
         launch_message: form.launch_message || '',
+        ship_auto_pickup: form.ship_auto_pickup,
+        ship_pickup_location: form.ship_pickup_location || '',
+        ship_days_standard: Number(form.ship_days_standard),
+        ship_days_custom: Number(form.ship_days_custom),
+        ship_weight_grams: Number(form.ship_weight_grams),
+        ship_box_cm: form.ship_box_cm || '30x25x5',
+        ship_run_hour: Number(form.ship_run_hour),
       })
       setForm(fromApi(res.data))
       setSaved(true)
@@ -149,6 +156,51 @@ export default function AdminSettings() {
               Current rule: {formatINR(Number(form.free_shipping_threshold))}+ ships free, otherwise {formatINR(Number(form.delivery_fee))}. Free shipping is judged on cart value before discounts.
             </span>
           </label>
+        </div>
+
+        {/* Delhivery automatic pickups */}
+        <div className="border border-panel-2 p-6 space-y-5">
+          <h2 className="font-mono text-xs uppercase tracking-widest text-acid">Delhivery shipping</h2>
+          {!form.ship_configured && (
+            <p className="border border-riot bg-riot/10 text-riot text-[11px] font-mono px-3 py-2">
+              Delhivery API token is not set on the server (DELHIVERY_API_TOKEN), so pickups can't be booked yet.
+            </p>
+          )}
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" name="ship_auto_pickup" checked={form.ship_auto_pickup} onChange={handleChange} className="accent-acid" />
+            <div>
+              <span className="font-mono text-sm text-paper">Book pickups automatically</span>
+              <p className="font-mono text-[11px] text-slate">
+                Every day at {String(form.ship_run_hour).padStart(2, '0')}:00 IST, paid orders due for the next pickup day get a Delhivery tracking id, one pickup is booked, and each customer gets a WhatsApp with their tracking id. No pickups on Sundays.
+              </p>
+            </div>
+          </label>
+          <label className="block">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Pickup location name (exactly as in Delhivery One)</span>
+            <input name="ship_pickup_location" value={form.ship_pickup_location || ''} onChange={handleChange} placeholder="e.g. Loopstitch Warehouse" className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Pickup after (days) — regular</span>
+              <input name="ship_days_standard" type="number" min="1" max="30" value={form.ship_days_standard} onChange={handleChange} className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+            </label>
+            <label className="block">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Pickup after (days) — custom</span>
+              <input name="ship_days_custom" type="number" min="1" max="30" value={form.ship_days_custom} onChange={handleChange} className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+            </label>
+            <label className="block">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Weight per tee (grams)</span>
+              <input name="ship_weight_grams" type="number" min="50" step="10" value={form.ship_weight_grams} onChange={handleChange} className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+            </label>
+            <label className="block">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Box size L×W×H (cm)</span>
+              <input name="ship_box_cm" value={form.ship_box_cm || ''} onChange={handleChange} placeholder="30x25x5" className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+            </label>
+            <label className="block col-span-2 sm:col-span-1">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Daily booking time (hour, IST)</span>
+              <input name="ship_run_hour" type="number" min="0" max="23" value={form.ship_run_hour} onChange={handleChange} className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono" />
+            </label>
+          </div>
         </div>
 
         {/* Payment methods */}

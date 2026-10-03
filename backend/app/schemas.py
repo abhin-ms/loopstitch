@@ -1,5 +1,5 @@
 from typing import List, Literal, Optional
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from . import models
@@ -167,6 +167,12 @@ class OrderOut(BaseModel):
     cod_advance_percent: Optional[float] = 0.0
     order_type: str = "standard"
     custom_total_pieces: Optional[int] = None
+    pickup_date: Optional[date] = None
+    courier_name: Optional[str] = ""
+    awb: Optional[str] = ""
+    pickup_request_id: Optional[str] = ""
+    courier_status: Optional[str] = ""
+    courier_error: Optional[str] = ""
     created_at: datetime
     items: List[OrderItemOut] = []
 
@@ -336,6 +342,14 @@ class SettingsOut(BaseModel):
     launch_mode: bool = False
     launch_date: str = ""         # ISO datetime for the countdown, "" = no countdown
     launch_message: str = ""
+    ship_configured: bool = False   # DELHIVERY_API_TOKEN present on the server
+    ship_auto_pickup: bool = True
+    ship_pickup_location: str = ""
+    ship_days_standard: int = 3
+    ship_days_custom: int = 5
+    ship_weight_grams: int = 250
+    ship_box_cm: str = "30x25x5"
+    ship_run_hour: int = 18
 
 
 class SettingsUpdate(BaseModel):
@@ -346,6 +360,13 @@ class SettingsUpdate(BaseModel):
     launch_mode: Optional[bool] = None
     launch_date: Optional[str] = Field(default=None, max_length=40)
     launch_message: Optional[str] = Field(default=None, max_length=200)
+    ship_auto_pickup: Optional[bool] = None
+    ship_pickup_location: Optional[str] = Field(default=None, max_length=150)
+    ship_days_standard: Optional[int] = Field(default=None, ge=1, le=30)
+    ship_days_custom: Optional[int] = Field(default=None, ge=1, le=30)
+    ship_weight_grams: Optional[int] = Field(default=None, ge=50, le=20000)
+    ship_box_cm: Optional[str] = Field(default=None, pattern=r"^\s*\d+(\.\d+)?\s*[xX]\s*\d+(\.\d+)?\s*[xX]\s*\d+(\.\d+)?\s*$")
+    ship_run_hour: Optional[int] = Field(default=None, ge=0, le=23)
 
 
 class PublicLaunchSettings(BaseModel):

@@ -60,6 +60,13 @@ def ensure_columns() -> None:
             models.Order.customer_id,
             models.Order.order_type,
             models.Order.custom_total_pieces,
+            models.Order.pickup_date,
+            models.Order.courier_name,
+            models.Order.awb,
+            models.Order.pickup_request_id,
+            models.Order.courier_status,
+            models.Order.courier_error,
+            models.Order.shipped_msg_sent,
         ],
         "order_items": [
             models.OrderItem.line_discount,
@@ -192,6 +199,13 @@ def seed_settings() -> None:
         "cod_enabled": "false",
         "whatsapp_enabled": "true",
         "launch_mode": "false",
+        "ship_auto_pickup": "true",
+        "ship_pickup_location": "",
+        "ship_days_standard": "3",
+        "ship_days_custom": "5",
+        "ship_weight_grams": "250",
+        "ship_box_cm": "30x25x5",
+        "ship_run_hour": "18",
     }
     db = SessionLocal()
     try:

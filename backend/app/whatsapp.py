@@ -16,8 +16,10 @@ ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v23.0")
 
 # Template names/language exactly as approved in WhatsApp Manager (change in the server env, no code change needed)
-OTP_TEMPLATE = os.getenv("WHATSAPP_OTP_TEMPLATE", "otp_verification_5")
+OTP_TEMPLATE = os.getenv("WHATSAPP_OTP_TEMPLATE", "otp_verification")
 ORDER_TEMPLATE = os.getenv("WHATSAPP_ORDER_TEMPLATE", "order_confirm")
+# order_shipped has a static "Track order" link button, so only body variables are sent
+SHIPPED_TEMPLATE = os.getenv("WHATSAPP_SHIPPED_TEMPLATE", "order_shipped")
 TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "en")
 
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
@@ -162,4 +164,32 @@ def send_otp_message(phone: str, otp_code: str) -> Dict[str, Any]:
         language_code=TEMPLATE_LANG,
         body_params=[otp_code],
         is_authentication=True,
+    )
+
+
+def to_e164(phone: str) -> str:
+    """'9876543210' / '91 98765 43210' -> '+919876543210' (Indian numbers by default)."""
+    digits = "".join(c for c in phone if c.isdigit())
+    if len(digits) == 10:
+        return "+91" + digits
+    return "+" + digits
+
+
+def build_shipped_params(customer_name: str, order_number: str, courier: str, awb: str) -> List[str]:
+    """
+    order_shipped template variables:
+      {{1}} = customer first name   {{2}} = order number
+      {{3}} = delivery partner      {{4}} = tracking id (AWB)
+    """
+    first_name = customer_name.strip().split()[0] if customer_name.strip() else "there"
+    return [first_name, order_number, courier, awb]
+
+
+def send_shipped_message(phone: str, customer_name: str, order_number: str, courier: str, awb: str) -> Dict[str, Any]:
+    """Tell the customer their parcel is booked with the courier and give them the tracking id."""
+    return send_template_message(
+        phone=phone,
+        template_name=SHIPPED_TEMPLATE,
+        language_code=TEMPLATE_LANG,
+        body_params=build_shipped_params(customer_name, order_number, courier, awb),
     )

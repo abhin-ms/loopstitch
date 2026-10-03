@@ -23,6 +23,8 @@ from .database import engine, get_db, SessionLocal
 from .offers import compute_best_offer, get_shipping_config, set_setting, shipping_fee_for, validate_coupon, apply_coupon_discount, check_coupon, coupon_label, price_cart
 from . import razorpay as razorpay_helper
 from . import whatsapp as whatsapp_helper
+from . import delhivery as delhivery_helper
+from . import courier
 from . import customer_auth
 from . import seo
 
@@ -802,10 +804,44 @@ def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, db: S
     order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    if payload.status == models.OrderStatus.paid:
+        courier.schedule_pickup(db, order)
+    elif payload.status == models.OrderStatus.cancelled and order.status != models.OrderStatus.cancelled:
+        courier.cancel_for_order(order)
     order.status = payload.status
     db.commit()
     db.refresh(order)
     return order
+
+
+@app.post("/api/admin/shipping/book-now")
+def admin_book_pickups_now(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Run the daily Delhivery batch immediately (orders due by the next pickup day)."""
+    try:
+        return courier.run_pickup_batch(db)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/admin/shipping/sync")
+def admin_sync_tracking(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    if not delhivery_helper.is_configured():
+        raise HTTPException(status_code=400, detail="Delhivery is not configured")
+    try:
+        return {"updated": courier.sync_tracking(db)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Delhivery tracking failed: {exc}")
+
+
+@app.get("/api/admin/orders/{order_id}/label")
+def admin_shipping_label(order_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order or not order.awb:
+        raise HTTPException(status_code=404, detail="No shipment for this order yet")
+    try:
+        return {"url": delhivery_helper.label_url(order.awb)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/api/admin/orders/{order_id}/invoice")
@@ -843,6 +879,14 @@ def _build_settings_out(db: Session) -> schemas.SettingsOut:
         launch_mode=raw.get("launch_mode", "false") == "true",
         launch_date=raw.get("launch_date", ""),
         launch_message=raw.get("launch_message", ""),
+        ship_configured=delhivery_helper.is_configured(),
+        ship_auto_pickup=raw.get("ship_auto_pickup", "true") == "true",
+        ship_pickup_location=raw.get("ship_pickup_location", ""),
+        ship_days_standard=int(float(raw.get("ship_days_standard", "3"))),
+        ship_days_custom=int(float(raw.get("ship_days_custom", "5"))),
+        ship_weight_grams=int(float(raw.get("ship_weight_grams", "250"))),
+        ship_box_cm=raw.get("ship_box_cm", "30x25x5"),
+        ship_run_hour=int(float(raw.get("ship_run_hour", "18"))),
     )
 
 
@@ -893,6 +937,16 @@ def admin_update_settings(payload: schemas.SettingsUpdate, db: Session = Depends
         set_setting(db, "launch_date", payload.launch_date.strip())
     if payload.launch_message is not None:
         set_setting(db, "launch_message", payload.launch_message.strip())
+    if payload.ship_auto_pickup is not None:
+        set_setting(db, "ship_auto_pickup", "true" if payload.ship_auto_pickup else "false")
+    if payload.ship_pickup_location is not None:
+        set_setting(db, "ship_pickup_location", payload.ship_pickup_location.strip())
+    for key in ("ship_days_standard", "ship_days_custom", "ship_weight_grams", "ship_run_hour"):
+        value = getattr(payload, key)
+        if value is not None:
+            set_setting(db, key, str(value))
+    if payload.ship_box_cm is not None:
+        set_setting(db, "ship_box_cm", payload.ship_box_cm.replace(" ", "").lower())
     db.commit()
     return _build_settings_out(db)
 
@@ -956,6 +1010,9 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session 
     elif order.payment_method == "cod":
         # COD advance paid — order stays pending but advance is recorded
         order.status = models.OrderStatus.paid
+
+    # Pickup date: +3 days standard / +5 days custom (booked by the courier worker)
+    courier.schedule_pickup(db, order)
 
     db.commit()
     db.refresh(order)
@@ -1149,6 +1206,27 @@ def admin_resend_notification(
     ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Associated order not found")
+
+    if n.message_type == "order_shipped":
+        # tracking-id message: re-send with the same template + buttons
+        n.status = "pending"
+        n.error_message = ""
+        db.flush()
+        try:
+            result = whatsapp_helper.send_shipped_message(
+                n.customer_phone, order.customer_name, order.order_number,
+                order.courier_name or delhivery_helper.COURIER_NAME, order.awb or "",
+            )
+            n.whatsapp_message_id = result.get("message_id", "")
+            n.status = "sent"
+            n.sent_at = _utcnow()
+            order.shipped_msg_sent = True
+        except Exception as exc:
+            n.status = "failed"
+            n.error_message = str(exc)[:500]
+        db.commit()
+        db.refresh(n)
+        return n
 
     items = order.items
     items_summary = _build_items_summary(items)
