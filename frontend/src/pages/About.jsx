@@ -13,8 +13,8 @@ export default function About() {
   const [showIOSModal, setShowIOSModal] = useState(false)
 
   useEffect(() => {
-    document.title = 'About | Loopstitch Co.'
-    return () => { document.title = 'Loopstitch Co.' }
+    document.title = 'About | Loopstitch'
+    return () => { document.title = 'Loopstitch' }
   }, [])
 
   return (
@@ -25,7 +25,7 @@ export default function About() {
       </h1>
       <div className="space-y-5 text-paper/75 text-sm sm:text-base leading-relaxed">
         <p>
-          Loopstitch Co. started with one idea: streetwear that actually
+          Loopstitch started with one idea: streetwear that actually
           gets anime right — not a licensed logo slapped on a blank tee, but original graphics designed
           for the culture.
         </p>

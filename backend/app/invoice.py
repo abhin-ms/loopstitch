@@ -119,7 +119,7 @@ def generate_invoice_pdf(order) -> bytes:
         "For order queries, reply to the confirmation email.",
         small_grey,
     ))
-    elements.append(Paragraph("Loopstitch Co. — printed on demand, made for fans.", small_grey))
+    elements.append(Paragraph("Loopstitch — printed on demand, made for fans.", small_grey))
 
     doc.build(elements)
     pdf_bytes = buffer.getvalue()

@@ -22,8 +22,8 @@ export default function Shop() {
   const wishlist = useWishlist()
 
   useEffect(() => {
-    document.title = 'Shop unisex oversized tees | Loopstitch Co.'
-    return () => { document.title = 'Loopstitch Co.' }
+    document.title = 'Shop unisex oversized tees | Loopstitch'
+    return () => { document.title = 'Loopstitch' }
   }, [])
 
   useEffect(() => {
