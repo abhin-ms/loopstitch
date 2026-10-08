@@ -77,7 +77,7 @@ export default function MobileCustomCheckout() {
       key: razorpayKeyId,
       amount: Math.round(amountToPay * 100),
       currency: 'INR',
-      name: 'Loopstitch Co.',
+      name: 'Loopstitch',
       description: `Custom order #${order.order_number}`,
       order_id: order.razorpay_order_id,
       handler: async (response) => {
@@ -121,8 +121,9 @@ export default function MobileCustomCheckout() {
       if (amountToPay > 0) {
         setSubmitting(false)
         setPayProcessing(true)
-        const rpRes = await client.post('/api/razorpay/create-order', { amount: amountToPay, receipt: order.order_number })
-        launchRazorpay({ ...order, razorpay_order_id: rpRes.data.order_id }, amountToPay)
+        // amount is set by the server from the order; never send it from here
+        const rpRes = await client.post('/api/razorpay/create-order', { order_number: order.order_number })
+        launchRazorpay({ ...order, razorpay_order_id: rpRes.data.order_id }, rpRes.data.amount / 100)
         return
       }
 

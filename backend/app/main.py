@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 import uuid
 import logging
 import datetime
@@ -27,6 +28,8 @@ from . import delhivery as delhivery_helper
 from . import courier
 from . import customer_auth
 from . import seo
+from . import ratelimit
+from . import order_lifecycle
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -36,20 +39,22 @@ def _ensure_coupon_columns() -> None:
     import sqlalchemy as sa
     wanted = {"discount_type": "VARCHAR(20) DEFAULT 'percent'", "flat_amount": "FLOAT DEFAULT 0",
               "buy_quantity": "INTEGER DEFAULT 0", "get_quantity": "INTEGER DEFAULT 0"}
+    tables = {"coupons": wanted, "otps": {"attempts": "INTEGER DEFAULT 0"}}
     try:
         with engine.begin() as conn:
-            existing = {c["name"] for c in sa.inspect(conn).get_columns("coupons")}
-            for name, ddl in wanted.items():
-                if name not in existing:
-                    conn.execute(sa.text(f"ALTER TABLE coupons ADD COLUMN {name} {ddl}"))
-                    logging.getLogger(__name__).info("added coupons.%s", name)
+            for table, columns in tables.items():
+                existing = {c["name"] for c in sa.inspect(conn).get_columns(table)}
+                for name, ddl in columns.items():
+                    if name not in existing:
+                        conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                        logging.getLogger(__name__).info("added %s.%s", table, name)
     except Exception:
-        logging.getLogger(__name__).exception("Could not add coupon columns; run migrate.py")
+        logging.getLogger(__name__).exception("Could not add missing columns; run migrate.py")
 
 
 _ensure_coupon_columns()
 
-app = FastAPI(title="Loopstitch Co. API", version="1.0.0")
+app = FastAPI(title="Loopstitch API", version="1.0.0")
 
 # CORS - allow the storefront + local dev to call the API
 origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://loopstitch.online,https://www.loopstitch.online").split(",")
@@ -127,18 +132,19 @@ def product_load_options():
 # ============================================================
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "brand": "Loopstitch Co."}
+    return {"status": "ok", "brand": "Loopstitch"}
 
 
 # ============================================================
 # ADMIN AUTH  (hidden route — no signup endpoint exists at all)
 # ============================================================
 @app.post("/api/admin/login", response_model=schemas.TokenResponse)
-def admin_login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
+def admin_login(payload: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
+    ratelimit.limit(request, "admin_login", max_hits=10, window_seconds=15 * 60)
     admin = db.query(models.Admin).filter(models.Admin.username == payload.username).first()
     if not admin or not auth.verify_password(payload.password, admin.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
-    token = auth.create_access_token({"sub": admin.username})
+    token = auth.create_access_token({"sub": admin.username, "role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -150,33 +156,42 @@ def admin_me(current: models.Admin = Depends(auth.get_current_admin)):
 # ============================================================
 # CUSTOMER AUTH  (OTP login via WhatsApp)
 # ============================================================
+OTP_HOURLY_CAP = int(os.getenv("OTP_HOURLY_CAP", "200"))  # store-wide ceiling on WhatsApp OTP sends
+
+
+def _normalize_phone(raw: str) -> str:
+    """Keep digits only and use the last 10 (Indian mobile)."""
+    digits = "".join(c for c in (raw or "") if c.isdigit())
+    return digits[-10:] if len(digits) > 10 else digits
+
+
 @app.post("/api/auth/send-otp", response_model=schemas.SendOTPResponse)
-def send_otp(payload: schemas.SendOTPRequest, db: Session = Depends(get_db)):
+def send_otp(payload: schemas.SendOTPRequest, request: Request, db: Session = Depends(get_db)):
     """Generate a 6-digit OTP and send it via WhatsApp."""
-    phone = payload.phone.strip()
-    if not phone or len(phone) < 6:
+    phone = _normalize_phone(payload.phone)
+    if len(phone) != 10:
         raise HTTPException(status_code=400, detail="Invalid phone number")
 
-    # Normalize phone to 10-digit Indian number
-    phone_digits = "".join(c for c in phone if c.isdigit())
-    if len(phone_digits) > 10:
-        phone_digits = phone_digits[-10:]
-    phone = phone_digits
+    ratelimit.limit(request, "send_otp", max_hits=5, window_seconds=10 * 60)
+    hour_ago = _utcnow() - datetime.timedelta(hours=1)
+    if db.query(models.OTP).filter(models.OTP.created_at >= hour_ago).count() >= OTP_HOURLY_CAP:
+        logger.warning("OTP hourly cap (%s) reached; refusing new OTPs", OTP_HOURLY_CAP)
+        raise HTTPException(status_code=429, detail="Login is busy right now. Please try again shortly.")
 
-    # Rate limit: max 1 OTP per 60 seconds
-    recent = db.query(models.OTP).filter(
-        models.OTP.phone == phone,
-        models.OTP.used == False,  # noqa: E712
-    ).order_by(models.OTP.created_at.desc()).first()
-    if recent:
-        age = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - recent.created_at).total_seconds()
-        if age < 45:
-            raise HTTPException(status_code=429, detail="Please wait before requesting another OTP")
+    # Per phone: one code every 45 s and at most 5 an hour (used or not), so
+    # burning a code with wrong guesses can't be used to get fresh ones faster.
+    phone_codes = db.query(models.OTP).filter(models.OTP.phone == phone, models.OTP.created_at >= hour_ago)
+    if phone_codes.filter(models.OTP.created_at >= _utcnow() - datetime.timedelta(seconds=45)).count():
+        raise HTTPException(status_code=429, detail="Please wait before requesting another OTP")
+    if phone_codes.count() >= 5:
+        raise HTTPException(status_code=429, detail="Too many OTP requests for this number. Try again in an hour.")
 
+    # only the newest code is ever valid
+    db.query(models.OTP).filter(models.OTP.phone == phone, models.OTP.used == False).update(  # noqa: E712
+        {models.OTP.used: True}, synchronize_session=False
+    )
     otp_code = customer_auth.generate_otp()
-    print(f"OTP for {phone}: {otp_code}", flush=True)
-    logger.info("OTP for %s: %s", phone, otp_code)
-    expires_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(minutes=5)
+    expires_at = _utcnow() + datetime.timedelta(minutes=customer_auth.OTP_EXPIRE_MINUTES)
 
     otp_record = models.OTP(phone=phone, otp_code=otp_code, expires_at=expires_at)
     db.add(otp_record)
@@ -193,29 +208,35 @@ def send_otp(payload: schemas.SendOTPRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/verify-otp", response_model=schemas.CustomerTokenResponse)
-def verify_otp(payload: schemas.VerifyOTPRequest, db: Session = Depends(get_db)):
+def verify_otp(payload: schemas.VerifyOTPRequest, request: Request, db: Session = Depends(get_db)):
     """Verify OTP and return a customer JWT."""
-    phone = payload.phone.strip()
-    phone_digits = "".join(c for c in phone if c.isdigit())
-    if len(phone_digits) > 10:
-        phone_digits = phone_digits[-10:]
-    phone = phone_digits
-
+    ratelimit.limit(request, "verify_otp", max_hits=20, window_seconds=10 * 60)
+    phone = _normalize_phone(payload.phone)
     otp_code = payload.otp.strip()
 
+    # The newest unused code for this phone is the only one that counts; wrong guesses burn it.
     otp_record = db.query(models.OTP).filter(
         models.OTP.phone == phone,
-        models.OTP.otp_code == otp_code,
         models.OTP.used == False,  # noqa: E712
-    ).order_by(models.OTP.created_at.desc()).first()
+    ).order_by(models.OTP.created_at.desc()).with_for_update().first()
 
     if not otp_record:
         raise HTTPException(status_code=400, detail="Invalid OTP code")
 
-    if otp_record.expires_at < datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None):
+    if otp_record.expires_at < _utcnow():
+        otp_record.used = True
+        db.commit()
         raise HTTPException(status_code=400, detail="OTP has expired")
 
-    # Mark OTP as used
+    if not secrets.compare_digest(otp_record.otp_code, otp_code):
+        otp_record.attempts = (otp_record.attempts or 0) + 1
+        if otp_record.attempts >= customer_auth.OTP_MAX_ATTEMPTS:
+            otp_record.used = True
+            db.commit()
+            raise HTTPException(status_code=400, detail="Too many wrong attempts. Please request a new OTP.")
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid OTP code")
+
     otp_record.used = True
     db.commit()
 
@@ -463,7 +484,27 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current: mode
     return {"detail": "Product deleted"}
 
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+# content type -> file extension we save with. The extension is never taken from the
+# uploaded filename: an "image" named x.html would otherwise be served as a web page
+# on loopstitch.online and could read the admin token from localStorage.
+ALLOWED_IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+
+_MAGIC = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/gif": (b"GIF87a", b"GIF89a"),
+    "application/pdf": (b"%PDF-",),
+}
+
+
+def _check_file_matches_type(contents: bytes, content_type: str) -> None:
+    """Reject files whose bytes don't match the type the browser claimed."""
+    if content_type == "image/webp":
+        ok = contents[:4] == b"RIFF" and contents[8:12] == b"WEBP"
+    else:
+        ok = any(contents.startswith(sig) for sig in _MAGIC.get(content_type, (b"",)))
+    if not ok:
+        raise HTTPException(status_code=400, detail="The file doesn't match its type. Please upload a real image or PDF.")
 
 
 @app.post("/api/admin/products/{product_id}/images", response_model=schemas.ProductOut)
@@ -491,8 +532,8 @@ async def upload_product_images(
             if len(contents) > MAX_UPLOAD_SIZE:
                 raise HTTPException(status_code=400, detail="File too large. Maximum size is 10 MB.")
 
-        ext = os.path.splitext(file.filename)[1] or ".jpg"
-        fname = f"{uuid.uuid4().hex}{ext}"
+        _check_file_matches_type(contents, file.content_type)
+        fname = f"{uuid.uuid4().hex}{ALLOWED_IMAGE_TYPES[file.content_type]}"
 
         url = store_upload(contents, fname, file.content_type, "products")
 
@@ -747,42 +788,41 @@ def customer_order_history(
     return orders
 
 
-@app.get("/api/orders/{order_number}", response_model=schemas.OrderOut)
-def get_order_by_number(order_number: str, token: Optional[str] = Depends(auth.oauth2_scheme), db: Session = Depends(get_db)):
-    order = db.query(models.Order).options(joinedload(models.Order.items)).filter(
-        models.Order.order_number == order_number
-    ).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+def _order_for_viewer(order_number: str, token: Optional[str], db: Session) -> models.Order:
+    """Return the order only to its own customer, or to an admin. 404 for everyone else,
+    so order numbers can't be probed."""
     if token is None:
         raise HTTPException(status_code=401, detail="Authentication required to view orders")
     try:
         payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-        username = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except Exception:
+    except auth.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return order
+
+    order = db.query(models.Order).options(joinedload(models.Order.items)).filter(
+        models.Order.order_number == order_number
+    ).first()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    role, sub = payload.get("role"), payload.get("sub")
+    if role == "admin" and db.query(models.Admin).filter(models.Admin.username == sub).first():
+        return order
+    if role == "customer":
+        customer = db.query(models.Customer).filter(models.Customer.phone == sub).first()
+        if customer is not None and order.customer_id == customer.id:
+            return order
+    raise HTTPException(status_code=404, detail="Order not found")
+
+
+@app.get("/api/orders/{order_number}", response_model=schemas.OrderOut)
+def get_order_by_number(order_number: str, token: Optional[str] = Depends(auth.oauth2_scheme), db: Session = Depends(get_db)):
+    return _order_for_viewer(order_number, token, db)
 
 
 @app.get("/api/orders/{order_number}/invoice")
 def download_order_invoice(order_number: str, token: Optional[str] = Depends(auth.oauth2_scheme), db: Session = Depends(get_db)):
     from .invoice import generate_invoice_pdf
-    order = db.query(models.Order).options(joinedload(models.Order.items)).filter(
-        models.Order.order_number == order_number
-    ).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if token is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    try:
-        payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-        username = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    order = _order_for_viewer(order_number, token, db)
     pdf_bytes = generate_invoice_pdf(order)
     return Response(
         content=pdf_bytes,
@@ -804,11 +844,15 @@ def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, db: S
     order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if payload.status == models.OrderStatus.paid:
-        courier.schedule_pickup(db, order)
-    elif payload.status == models.OrderStatus.cancelled and order.status != models.OrderStatus.cancelled:
-        courier.cancel_for_order(order)
-    order.status = payload.status
+    if payload.status in order_lifecycle.CLOSED:
+        if payload.status == models.OrderStatus.cancelled and order.status != models.OrderStatus.cancelled:
+            courier.cancel_for_order(order)
+        order_lifecycle.close_order(db, order, payload.status)  # gives the stock back once
+    else:
+        if not order_lifecycle.reopen_order(db, order, payload.status):  # takes the stock again if it was closed
+            raise HTTPException(status_code=409, detail="Not enough stock left to reopen this order")
+        if payload.status == models.OrderStatus.paid:
+            courier.schedule_pickup(db, order)
     db.commit()
     db.refresh(order)
     return order
@@ -955,38 +999,69 @@ def admin_update_settings(payload: schemas.SettingsUpdate, db: Session = Depends
 # RAZORPAY  (create order + verify payment)
 # ============================================================
 @app.post("/api/razorpay/create-order", response_model=schemas.RazorpayOrderResponse)
-def razorpay_create_order(payload: schemas.RazorpayOrderRequest):
-    """Create a Razorpay order for the given amount. Returns order_id + key for the frontend."""
-    amount_paise = int(round(payload.amount * 100))
-    logger.info("Razorpay create-order: amount=%s paise, receipt=%s", amount_paise, payload.receipt)
-    if amount_paise < 100:
-        raise HTTPException(status_code=400, detail="Amount must be at least ₹1.00")
+def razorpay_create_order(payload: schemas.RazorpayOrderRequest, db: Session = Depends(get_db)):
+    """Create (or reuse) the Razorpay order for one of our orders.
 
-    try:
-        result = razorpay_helper.create_order(
-            amount_paise=amount_paise,
-            currency=payload.currency,
-            receipt=payload.receipt,
-        )
-    except Exception as exc:
-        logger.error("Razorpay create-order failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {exc}")
+    The amount always comes from the order in the database (full total, or the COD
+    advance) — never from the browser — and the Razorpay order id is stored on the
+    order so /verify can check the payment belongs to it.
+    """
+    order = db.query(models.Order).filter(
+        models.Order.order_number == payload.order_number
+    ).with_for_update().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != models.OrderStatus.pending:
+        raise HTTPException(status_code=409, detail="This order is not waiting for payment")
+
+    amount_paise = order_lifecycle.amount_due_paise(order)
+    if amount_paise < 100:
+        raise HTTPException(status_code=400, detail="Nothing to pay online for this order")
+
+    if not order.razorpay_order_id:
+        try:
+            result = razorpay_helper.create_order(
+                amount_paise=amount_paise,
+                currency="INR",
+                receipt=order.order_number,
+                notes={"order_number": order.order_number},
+            )
+        except Exception as exc:
+            logger.error("Razorpay create-order failed for %s: %s", order.order_number, exc, exc_info=True)
+            raise HTTPException(status_code=502, detail="Could not start the payment. Please try again.")
+        order.razorpay_order_id = result["id"]
+        db.commit()
+        logger.info("Razorpay order %s created for %s (%s paise)", order.razorpay_order_id, order.order_number, amount_paise)
 
     return schemas.RazorpayOrderResponse(
-        order_id=result["id"],
-        amount=result["amount"],
-        currency=result["currency"],
+        order_id=order.razorpay_order_id,
+        amount=amount_paise,
+        currency="INR",
         key_id=razorpay_helper.get_key_id(),
     )
 
 
+def _apply_payment(db: Session, order: models.Order, rp_order_id: str, payment_id: str, signature: str) -> str:
+    """mark_paid + commit + WhatsApp confirmation on a fresh confirmation."""
+    try:
+        result = order_lifecycle.mark_paid(db, order, rp_order_id, payment_id, signature)
+    except order_lifecycle.PaymentMismatch as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    db.commit()
+    db.refresh(order)
+    if result == "paid":
+        _send_whatsapp_notification(db, order)
+    return result
+
+
 @app.post("/api/razorpay/verify")
 def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session = Depends(get_db)):
-    """Verify Razorpay payment signature and mark the order as paid."""
+    """Verify the Razorpay checkout signature and mark the order as paid."""
     if not payload.razorpay_order_id or not payload.razorpay_payment_id or not payload.razorpay_signature:
         raise HTTPException(status_code=400, detail="Missing payment verification fields")
 
-    # Verify HMAC-SHA256 signature
+    # Signature proves Razorpay saw this payment on this Razorpay order...
     if not razorpay_helper.verify_payment_signature(
         payload.razorpay_order_id,
         payload.razorpay_payment_id,
@@ -994,33 +1069,61 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session 
     ):
         raise HTTPException(status_code=400, detail="Payment signature verification failed")
 
-    # Find and update the order
     order = db.query(models.Order).options(joinedload(models.Order.items)).filter(
         models.Order.order_number == payload.order_number
-    ).first()
+    ).with_for_update().first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    order.razorpay_order_id = payload.razorpay_order_id
-    order.razorpay_payment_id = payload.razorpay_payment_id
-    order.razorpay_signature = payload.razorpay_signature
-
-    if order.payment_method == "online":
-        order.status = models.OrderStatus.paid
-    elif order.payment_method == "cod":
-        # COD advance paid — order stays pending but advance is recorded
-        order.status = models.OrderStatus.paid
-
-    # Pickup date: +3 days standard / +5 days custom (booked by the courier worker)
-    courier.schedule_pickup(db, order)
-
-    db.commit()
-    db.refresh(order)
-
-    # Send WhatsApp order confirmation after successful payment
-    _send_whatsapp_notification(db, order)
-
+    # ...and mark_paid checks that Razorpay order is the one we created for THIS order.
+    result = _apply_payment(db, order, payload.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature)
+    if result == "needs_refund":
+        raise HTTPException(
+            status_code=409,
+            detail="We received your payment but couldn't confirm this order. It will be refunded — please contact us.",
+        )
     return {"verified": True, "status": order.status.value}
+
+
+@app.post("/api/webhooks/razorpay")
+async def razorpay_webhook(request: Request):
+    """Razorpay webhook (payment.captured / order.paid): confirms orders even if the
+    shopper closed the tab before the browser could call /verify.
+
+    Set it up in Razorpay Dashboard → Webhooks with URL
+    https://loopstitch.online/api/webhooks/razorpay, events payment.captured + order.paid,
+    and put the same secret in RAZORPAY_WEBHOOK_SECRET.
+    """
+    body = await request.body()
+    if not razorpay_helper.verify_webhook_signature(body, request.headers.get("x-razorpay-signature", "")):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event = (await request.json()) if body else {}
+    if event.get("event") not in ("payment.captured", "order.paid"):
+        return {"status": "ignored"}
+    payment = ((event.get("payload") or {}).get("payment") or {}).get("entity") or {}
+    rp_order_id, payment_id = payment.get("order_id"), payment.get("id")
+    if not rp_order_id or not payment_id:
+        return {"status": "ignored"}
+
+    db = SessionLocal()
+    try:
+        order = db.query(models.Order).options(joinedload(models.Order.items)).filter(
+            models.Order.razorpay_order_id == rp_order_id
+        ).with_for_update().first()
+        if not order:
+            return {"status": "unknown_order"}
+        if int(payment.get("amount") or 0) != order_lifecycle.amount_due_paise(order):
+            logger.warning("Razorpay webhook amount mismatch for %s: %s", order.order_number, payment.get("amount"))
+            return {"status": "amount_mismatch"}
+        try:
+            result = _apply_payment(db, order, rp_order_id, payment_id, "webhook")
+        except HTTPException as exc:
+            logger.warning("Razorpay webhook for %s rejected: %s", order.order_number, exc.detail)
+            return {"status": "rejected"}
+        return {"status": result}
+    finally:
+        db.close()
 
 
 # ============================================================
@@ -1099,20 +1202,39 @@ def _send_whatsapp_notification(db: Session, order) -> None:
     db.commit()
 
 
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
+
+
+@app.get("/api/webhooks/whatsapp")
+def whatsapp_webhook_verify(request: Request):
+    """Meta's one-time webhook verification handshake."""
+    params = request.query_params
+    if (
+        WHATSAPP_VERIFY_TOKEN
+        and params.get("hub.mode") == "subscribe"
+        and secrets.compare_digest(params.get("hub.verify_token", ""), WHATSAPP_VERIFY_TOKEN)
+    ):
+        return Response(content=params.get("hub.challenge", ""), media_type="text/plain")
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
 @app.post("/api/webhooks/whatsapp")
 async def whatsapp_webhook(request: Request):
-    """Meta Cloud API webhook — handles verification (GET) and status updates (POST)."""
-    # Webhook verification (GET request from Meta)
-    if request.method == "GET":
-        params = dict(request.query_params)
-        verify_token = params.get("hub.verify_token", "")
-        challenge = params.get("hub.challenge", "")
-        if verify_token == "loopstitch_webhook":
-            return Response(content=challenge, media_type="text/plain")
-        raise HTTPException(status_code=403, detail="Verification failed")
-
-    # Status update (POST request)
-    body = await request.json()
+    """Meta Cloud API webhook — message status updates (sent / delivered / read / failed)."""
+    raw = await request.body()
+    if WHATSAPP_APP_SECRET:
+        import hashlib
+        import hmac
+        expected = "sha256=" + hmac.new(WHATSAPP_APP_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, request.headers.get("x-hub-signature-256", "")):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+    else:
+        logger.warning("WHATSAPP_APP_SECRET not set — WhatsApp webhook calls are not verified")
+    try:
+        body = await request.json()
+    except ValueError:
+        return {"status": "ok"}
     entry = body.get("entry", [{}])
     if not entry:
         return {"status": "ok"}
@@ -1489,7 +1611,7 @@ def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(a
 # ============================================================
 # CUSTOM T-SHIRT — public
 # ============================================================
-CUSTOM_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"}
+CUSTOM_ALLOWED_TYPES = {**ALLOWED_IMAGE_TYPES, "application/pdf": ".pdf"}
 
 
 @app.get("/api/custom/config", response_model=schemas.CustomConfigOut)
@@ -1507,12 +1629,25 @@ def get_custom_colors(db: Session = Depends(get_db)):
     ).order_by(models.CustomTshirtColor.position).all()
 
 
+def _is_our_custom_upload(url: str) -> bool:
+    """Design links on a custom order must be files our own upload endpoint stored."""
+    name = (url or "").rsplit("/", 1)[-1]
+    if not re.fullmatch(r"custom-[0-9a-f]{32}\.(jpg|png|webp|gif|pdf)", name):
+        return False
+    if url == f"/uploads/custom/{name}":
+        return True
+    bucket = os.getenv("GCS_BUCKET_NAME", "")
+    return bool(bucket) and url == f"https://storage.googleapis.com/{bucket}/{name}"
+
+
 @app.post("/api/custom/designs/upload")
 async def upload_custom_design(
+    request: Request,
     file: UploadFile = File(...),
-    print_area: str = Form("front"),
-    notes: str = Form(""),
+    print_area: str = Form("front", max_length=20),
+    notes: str = Form("", max_length=1000),
 ):
+    ratelimit.limit(request, "custom_upload", max_hits=20, window_seconds=60 * 60)
     if file.content_type not in CUSTOM_ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
     contents = b""
@@ -1521,8 +1656,8 @@ async def upload_custom_design(
         if len(contents) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=400, detail="File too large. Maximum size is 10 MB.")
 
-    ext = os.path.splitext(file.filename)[1] or ".jpg"
-    fname = f"custom-{uuid.uuid4().hex}{ext}"
+    _check_file_matches_type(contents, file.content_type)
+    fname = f"custom-{uuid.uuid4().hex}{CUSTOM_ALLOWED_TYPES[file.content_type]}"
     url = store_upload(contents, fname, file.content_type, "custom")
     file_type = "pdf" if file.content_type == "application/pdf" else "image"
     return {"file_url": url, "file_name": file.filename, "file_type": file_type, "print_area": print_area, "notes": notes}
@@ -1535,9 +1670,9 @@ def custom_quote(payload: schemas.CustomQuoteRequest, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Custom t-shirt not configured")
 
     total_pieces = sum(
-        s["quantity"] for sel in payload.colors for s in sel.sizes
+        s.quantity for sel in payload.colors for s in sel.sizes
     )
-    if total_pieces < config.min_order_qty:
+    if total_pieces < max(config.min_order_qty or 0, 1):
         raise HTTPException(status_code=400, detail=f"Minimum order is {config.min_order_qty} pieces")
 
     base_total = total_pieces * config.base_price
@@ -1578,9 +1713,9 @@ def create_custom_order(
         raise HTTPException(status_code=400, detail="Custom t-shirt printing is not available")
 
     total_pieces = sum(
-        s["quantity"] for sel in payload.colors for s in sel.sizes
+        s.quantity for sel in payload.colors for s in sel.sizes
     )
-    if total_pieces < config.min_order_qty:
+    if total_pieces < max(config.min_order_qty or 0, 1):
         raise HTTPException(status_code=400, detail=f"Minimum order is {config.min_order_qty} pieces")
 
     payment_method = payload.payment_method if payload.payment_method in ("cod", "online") else "cod"
@@ -1634,8 +1769,10 @@ def create_custom_order(
         if not color:
             raise HTTPException(status_code=400, detail=f"Color {sel.color_id} not found")
         for size_info in sel.sizes:
-            qty = size_info["quantity"]
-            size_label = size_info["size"]
+            qty = size_info.quantity
+            if qty == 0:
+                continue
+            size_label = size_info.size
             order_item = models.OrderItem(
                 order_id=order.id,
                 product_id=None,
@@ -1653,6 +1790,8 @@ def create_custom_order(
             db.add(order_item)
 
     for design in payload.designs:
+        if not _is_our_custom_upload(design.file_url):
+            raise HTTPException(status_code=400, detail="Please upload your design again.")
         custom_design = models.CustomTshirtDesign(
             order_id=order.id,
             file_url=design.file_url,
@@ -1856,7 +1995,8 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @app.post("/api/subscribe")
-def subscribe(payload: schemas.SubscribeIn, db: Session = Depends(get_db)):
+def subscribe(payload: schemas.SubscribeIn, request: Request, db: Session = Depends(get_db)):
+    ratelimit.limit(request, "subscribe", max_hits=10, window_seconds=60 * 60)
     contact = payload.contact.strip().lower()
     if _EMAIL_RE.match(contact):
         kind = "email"
@@ -1907,7 +2047,8 @@ def featured_reviews(db: Session = Depends(get_db)):
 
 
 @app.post("/api/products/{slug}/reviews")
-def submit_review(slug: str, payload: schemas.ReviewIn, db: Session = Depends(get_db)):
+def submit_review(slug: str, payload: schemas.ReviewIn, request: Request, db: Session = Depends(get_db)):
+    ratelimit.limit(request, "review", max_hits=5, window_seconds=60 * 60)
     product = db.query(models.Product).filter(models.Product.slug == slug).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -2376,6 +2517,7 @@ async def admin_blog_cover(file: UploadFile = File(...), current: models.Admin =
         contents += chunk
         if len(contents) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=400, detail="Image too large. Maximum size is 10 MB.")
-    fname = f"{uuid.uuid4().hex}{os.path.splitext(file.filename or '')[1] or '.jpg'}"
+    _check_file_matches_type(contents, file.content_type)
+    fname = f"{uuid.uuid4().hex}{ALLOWED_IMAGE_TYPES[file.content_type]}"
     url = store_upload(contents, fname, file.content_type, "products")
     return {"url": url}

@@ -150,7 +150,7 @@ export default function Customize() {
       key: razorpayKeyId,
       amount: Math.round(amountToPay * 100),
       currency: 'INR',
-      name: 'Loopstitch Co.',
+      name: 'Loopstitch',
       description: `Custom order #${orderData.order_number}`,
       order_id: orderData.razorpay_order_id,
       handler: async (response) => {
@@ -218,11 +218,9 @@ export default function Customize() {
       if (amountToPay > 0) {
         setSubmitting(false)
         setPayProcessing(true)
-        const razorpayOrder = await client.post('/api/razorpay/create-order', {
-          amount: amountToPay,
-          receipt: order.order_number,
-        })
-        launchRazorpay({ ...order, razorpay_order_id: razorpayOrder.data.order_id }, amountToPay)
+        // amount is set by the server from the order; never send it from here
+        const razorpayOrder = await client.post('/api/razorpay/create-order', { order_number: order.order_number })
+        launchRazorpay({ ...order, razorpay_order_id: razorpayOrder.data.order_id }, razorpayOrder.data.amount / 100)
         return
       }
       navigate('/order/confirm', { state: { order } })

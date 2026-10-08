@@ -48,7 +48,8 @@ def get_current_admin(token: str = Depends(oauth2_scheme), db: Session = Depends
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
+        # customer tokens are signed with the same key; only accept tokens issued by admin login
+        if username is None or payload.get("role") != "admin":
             raise credentials_exception
     except JWTError:
         raise credentials_exception

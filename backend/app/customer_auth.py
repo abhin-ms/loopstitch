@@ -6,8 +6,7 @@ Flow:
   2. POST /api/auth/verify-otp → verifies OTP, creates/finds customer, returns JWT
   3. GET  /api/auth/me          → returns customer profile (requires JWT)
 """
-import random
-import string
+import secrets
 import datetime
 import os
 
@@ -22,6 +21,7 @@ from . import models
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = "HS256"
 OTP_EXPIRE_MINUTES = 5
+OTP_MAX_ATTEMPTS = 5
 CUSTOMER_TOKEN_EXPIRE_DAYS = 7
 
 # Separate OAuth2 scheme for customer tokens (points at our verify-otp endpoint)
@@ -30,7 +30,7 @@ customer_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/verify-otp", au
 
 def generate_otp() -> str:
     """Generate a 6-digit numeric OTP."""
-    return "".join(random.choices(string.digits, k=6))
+    return f"{secrets.randbelow(10**6):06d}"
 
 
 def create_customer_token(phone: str) -> str:

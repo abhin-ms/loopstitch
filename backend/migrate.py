@@ -86,6 +86,9 @@ def ensure_columns() -> None:
         "product_sizes": [
             models.ProductSize.color_id,
         ],
+        "otps": [
+            models.OTP.attempts,
+        ],
     }
     with engine.begin() as conn:
         for table, columns in wanted.items():

@@ -93,7 +93,7 @@ export default function MobileCheckout() {
       key: razorpayKeyId,
       amount: Math.round(amountToPay * 100),
       currency: 'INR',
-      name: 'Loopstitch Co.',
+      name: 'Loopstitch',
       description: `Order #${orderNumber}`,
       order_id: orderData.razorpay_order_id,
       handler: async (response) => {
@@ -140,8 +140,9 @@ export default function MobileCheckout() {
       if (amountToPay > 0) {
         setSubmitting(false)
         setPayProcessing(true)
-        const rpRes = await client.post('/api/razorpay/create-order', { amount: amountToPay, receipt: orderData.order_number })
-        launchRazorpay({ ...orderData, razorpay_order_id: rpRes.data.order_id }, amountToPay, orderData.order_number)
+        // amount is set by the server from the order; never send it from here
+        const rpRes = await client.post('/api/razorpay/create-order', { order_number: orderData.order_number })
+        launchRazorpay({ ...orderData, razorpay_order_id: rpRes.data.order_id }, rpRes.data.amount / 100, orderData.order_number)
         return
       }
 
