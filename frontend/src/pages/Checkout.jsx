@@ -140,7 +140,7 @@ export default function Checkout() {
       key: razorpayKeyId,
       amount: Math.round(amountToPay * 100),
       currency: 'INR',
-      name: 'Loopstitch Co.',
+      name: 'Loopstitch',
       description: `Order #${orderNumber}`,
       order_id: orderData.razorpay_order_id,
       handler: async function (response) {
@@ -232,11 +232,9 @@ export default function Checkout() {
         setSubmitting(false)
         setPayProcessing(true)
         try {
-          const rpRes = await client.post('/api/razorpay/create-order', {
-            amount: amountToPay,
-            receipt: orderData.order_number,
-          })
-          launchRazorpay({ ...orderData, razorpay_order_id: rpRes.data.order_id }, amountToPay, orderData.order_number)
+          // amount is set by the server from the order; never send it from here
+          const rpRes = await client.post('/api/razorpay/create-order', { order_number: orderData.order_number })
+          launchRazorpay({ ...orderData, razorpay_order_id: rpRes.data.order_id }, rpRes.data.amount / 100, orderData.order_number)
         } catch (err) {
           const detail = err.response?.data?.detail || 'Failed to initialize payment. Please try again.'
           setError(detail)

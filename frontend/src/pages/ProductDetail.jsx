@@ -56,8 +56,8 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (!product) return undefined
-    const title = product.meta_title || `${product.name} | Loopstitch Co.`
-    const description = product.meta_description || product.description || `Shop ${product.name} from Loopstitch Co.`
+    const title = product.meta_title || `${product.name} | Loopstitch`
+    const description = product.meta_description || product.description || `Shop ${product.name} from Loopstitch`
     const seoImage = (product.colors?.[0]?.images || product.images || [])[0]?.url
     document.title = title
     const tags = [

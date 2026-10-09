@@ -7,9 +7,9 @@ export default function Blog() {
   const [posts, setPosts] = useState(null)
 
   useEffect(() => {
-    document.title = 'Journal | Loopstitch Co.'
+    document.title = 'Journal | Loopstitch'
     client.get('/api/blog').then((res) => setPosts(res.data)).catch(() => setPosts([]))
-    return () => { document.title = 'Loopstitch Co.' }
+    return () => { document.title = 'Loopstitch' }
   }, [])
 
   return (

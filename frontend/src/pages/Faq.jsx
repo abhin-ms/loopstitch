@@ -52,9 +52,9 @@ export default function Faq() {
   const faq = useMemo(() => buildFaq(cod), [cod])
 
   useEffect(() => {
-    document.title = 'FAQ & size help | Loopstitch Co.'
+    document.title = 'FAQ & size help | Loopstitch'
     client.get('/api/settings/checkout').then((res) => setCod(res.data)).catch(() => {})
-    return () => { document.title = 'Loopstitch Co.' }
+    return () => { document.title = 'Loopstitch' }
   }, [])
 
   // FAQPage markup so Google can show these answers directly in results

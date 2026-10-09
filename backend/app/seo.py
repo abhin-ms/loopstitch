@@ -13,7 +13,7 @@ from typing import Optional
 
 SITE_URL = os.getenv("SITE_URL", "https://loopstitch.online").rstrip("/")
 INDEX_HTML = os.getenv("INDEX_HTML_PATH", "/usr/share/nginx/html/index.html")
-BRAND = "Loopstitch Co."
+BRAND = "Loopstitch"
 
 
 def load_index() -> Optional[str]:

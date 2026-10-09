@@ -8,6 +8,8 @@ Automatic Delhivery pickups.
    books ONE pickup for the warehouse for that day, then WhatsApps each
    customer their tracking id.
 3. Every few hours sync_tracking() moves orders to shipped / delivered.
+4. Every tick, unpaid online orders older than ORDER_PAYMENT_TIMEOUT_MINUTES
+   are failed and their stock is released (order_lifecycle.expire_unpaid_orders).
 
 Runs as its own process (see supervisord.conf) so the 2 web workers can't
 book the same pickup twice:
@@ -21,7 +23,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from . import delhivery, models
+from . import delhivery, models, order_lifecycle
 from . import whatsapp as whatsapp_helper
 from .database import SessionLocal
 from .offers import set_setting
@@ -113,7 +115,7 @@ def _shipment_payload(order: models.Order, cfg: Dict) -> Dict:
         "shipment_width": str(width),
         "shipment_height": str(height),
         "shipping_mode": "Surface",
-        "seller_name": "Loopstitch Co.",
+        "seller_name": "Loopstitch",
         "waybill": "",
     }
 
@@ -250,6 +252,15 @@ def cancel_for_order(order: models.Order) -> None:
 def tick() -> None:
     db = SessionLocal()
     try:
+        # free stock held by orders that were never paid (runs even without Delhivery)
+        try:
+            expired = order_lifecycle.expire_unpaid_orders(db)
+            if expired:
+                logger.info("Released stock from %s unpaid orders", expired)
+        except Exception:
+            db.rollback()
+            logger.exception("Expiring unpaid orders failed")
+
         if not delhivery.is_configured():
             return
         cfg = load_config(db)

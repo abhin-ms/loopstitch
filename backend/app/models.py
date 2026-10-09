@@ -295,6 +295,7 @@ class OTP(Base):
     otp_code = Column(String(6), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
+    attempts = Column(Integer, default=0)  # wrong guesses; the code is burned after OTP_MAX_ATTEMPTS
     created_at = Column(DateTime, default=_utcnow)
 
 

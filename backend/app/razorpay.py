@@ -102,3 +102,17 @@ def verify_payment_signature(
     ).hexdigest()
 
     return hmac.compare_digest(expected, razorpay_signature)
+
+
+def order_payments(razorpay_order_id: str) -> list:
+    """All payment attempts on a Razorpay order (each has id, status, amount)."""
+    return get_client().order.payments(razorpay_order_id).get("items", [])
+
+
+def verify_webhook_signature(body: bytes, signature: str) -> bool:
+    """Check X-Razorpay-Signature: HMAC-SHA256(raw body, RAZORPAY_WEBHOOK_SECRET)."""
+    secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+    if not secret or not signature:
+        return False
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)

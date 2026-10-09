@@ -110,11 +110,11 @@ class OrderItemIn(BaseModel):
     product_id: int
     size: str
     color_id: Optional[int] = None
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=50)  # cap keeps the offer engine from expanding huge carts
 
 
 class OrderCreate(BaseModel):
-    customer_name: str
+    customer_name: str = Field(min_length=1, max_length=150)
     customer_email: EmailStr
     customer_phone: str
     shipping_address: str
@@ -123,7 +123,7 @@ class OrderCreate(BaseModel):
     pincode: str = ""
     payment_method: str = "cod"
     coupon_code: Optional[str] = None
-    items: List[OrderItemIn]
+    items: List[OrderItemIn] = Field(max_length=30)
 
 
 class OrderItemOut(BaseModel):
@@ -186,9 +186,8 @@ class OrderStatusUpdate(BaseModel):
 
 # ---------- Razorpay ----------
 class RazorpayOrderRequest(BaseModel):
-    amount: float = Field(gt=0, description="Amount in INR (e.g. 199.00)")
-    currency: str = "INR"
-    receipt: str = ""
+    # The amount is worked out on the server from the order; the browser only says which order.
+    order_number: str = Field(min_length=1, max_length=40)
 
 
 class RazorpayOrderResponse(BaseModel):
@@ -317,7 +316,7 @@ class OfferOut(OfferBase):
 
 # ---------- Cart quote (live totals preview) ----------
 class QuoteRequest(BaseModel):
-    items: List[OrderItemIn]
+    items: List[OrderItemIn] = Field(max_length=30)
     coupon_code: Optional[str] = None
 
 
@@ -575,9 +574,14 @@ class CustomDesignOut(BaseModel):
         from_attributes = True
 
 
+class CustomSizeQty(BaseModel):
+    size: str = Field(min_length=1, max_length=20)
+    quantity: int = Field(ge=0, le=1000)  # the customizer sends 0 for sizes not picked
+
+
 class CustomColorSelection(BaseModel):
     color_id: int
-    sizes: List[dict]  # [{"size": "M", "quantity": 5}, ...]
+    sizes: List[CustomSizeQty] = Field(min_length=1, max_length=20)
 
 
 class CustomDesignInput(BaseModel):

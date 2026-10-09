@@ -23,8 +23,8 @@ export default function Home() {
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
-    document.title = 'Loopstitch Co. | Wear a drop. Or wear your own.'
-    return () => { document.title = 'Loopstitch Co.' }
+    document.title = 'Loopstitch | Wear a drop. Or wear your own.'
+    return () => { document.title = 'Loopstitch' }
   }, [])
 
   useEffect(() => {

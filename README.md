@@ -1,6 +1,6 @@
-# Loopstitch Co. — Ecommerce Site
+# Loopstitch — Ecommerce Site
 
-A full-stack storefront + admin dashboard for **Loopstitch Co.**, built for `loopstitch.online`.
+A full-stack storefront + admin dashboard for **Loopstitch**, built for `loopstitch.online`.
 
 - **Backend:** Python (FastAPI + SQLAlchemy), JWT auth, PDF invoice generation
 - **Frontend:** React + Vite + Tailwind CSS v4 + Framer Motion
@@ -142,3 +142,17 @@ This starter ships with a **cash/UPI-on-delivery style checkout** (no payment ga
 - There is intentionally **no admin signup endpoint anywhere** — the only way to create an admin account is running `seed.py` yourself
 - Uploaded product images are stored in `backend/uploads/products/` and served at `/uploads/products/...`
 - Design system: display type is Anton (poster-style headlines), body is Space Grotesk, and prices/tags/labels use JetBrains Mono — paired with a black/red/acid-yellow palette and a halftone texture nodding to manga screentone, with a scrolling "drop ticker" as the signature element
+
+---
+
+## Tests
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
+Covers payment verification, stock release for unpaid/cancelled orders, order access,
+upload checks and OTP limits. Run them before every deploy.
+

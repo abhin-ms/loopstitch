@@ -18,7 +18,7 @@ export default function BlogPost() {
 
   useEffect(() => {
     if (!post) return undefined
-    document.title = `${post.title} | Loopstitch Co.`
+    document.title = `${post.title} | Loopstitch`
     const meta = document.head.querySelector('meta[name="description"]')
     const previous = meta?.getAttribute('content')
     if (meta && post.excerpt) meta.setAttribute('content', post.excerpt)
@@ -29,10 +29,10 @@ export default function BlogPost() {
     ld.textContent = JSON.stringify({
       '@context': 'https://schema.org', '@type': 'BlogPosting', headline: post.title, description: post.excerpt,
       datePublished: post.published_at, dateModified: post.updated_at, image: post.cover_url ? mediaUrl(post.cover_url) : undefined,
-      author: { '@type': 'Organization', name: 'Loopstitch Co.' },
+      author: { '@type': 'Organization', name: 'Loopstitch' },
     })
     document.head.appendChild(ld)
-    return () => { ld.remove(); document.title = 'Loopstitch Co.'; if (meta && previous) meta.setAttribute('content', previous) }
+    return () => { ld.remove(); document.title = 'Loopstitch'; if (meta && previous) meta.setAttribute('content', previous) }
   }, [post])
 
   if (missing) {

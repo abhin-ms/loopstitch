@@ -67,7 +67,7 @@ function LaunchVideo() {
 export default function LaunchingSoon({ date = '', message = '' }) {
   useEffect(() => {
     const prev = document.title
-    document.title = 'Launching Soon — Loopstitch Co.'
+    document.title = 'Launching Soon — Loopstitch'
     // Always dark here so the dark video blends in; restore the visitor's theme on leave
     const root = document.documentElement
     const prevTheme = root.getAttribute('data-theme')
@@ -135,7 +135,7 @@ export default function LaunchingSoon({ date = '', message = '' }) {
       </div>
 
       <footer className="launch-short-hide relative z-10 text-center font-mono text-[11px] text-slate py-2 sm:py-4">
-        © {new Date().getFullYear()} Loopstitch Co.
+        © {new Date().getFullYear()} Loopstitch
       </footer>
     </div>
   )
