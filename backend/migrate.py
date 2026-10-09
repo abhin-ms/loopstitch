@@ -246,6 +246,34 @@ def ensure_custom_tshirt_tables() -> None:
         db.close()
 
 
+def ensure_enum_values() -> None:
+    """MySQL/MariaDB store the allowed values of an Enum column in the table itself,
+    and nothing else ever updates them. Widen any column whose ENUM(...) is missing
+    values the code now uses (e.g. orders.status 'failed'), without dropping old ones."""
+    if engine.dialect.name not in ("mysql", "mariadb"):
+        return  # SQLite/Postgres-as-VARCHAR need nothing
+    with engine.begin() as conn:
+        insp = sa.inspect(conn)
+        tables = set(insp.get_table_names())
+        for table in Base.metadata.sorted_tables:
+            if table.name not in tables:
+                continue
+            existing = {c["name"]: c for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if not isinstance(col.type, sa.Enum) or col.name not in existing:
+                    continue
+                have = list(getattr(existing[col.name]["type"], "enums", None) or [])
+                want = list(col.type.enums)
+                missing = [v for v in want if v not in have]
+                if not missing:
+                    continue
+                values = want + [v for v in have if v not in want]  # keep anything already stored
+                col_type = sa.Enum(*values).compile(dialect=engine.dialect)
+                null = "NULL" if existing[col.name].get("nullable", True) else "NOT NULL"
+                conn.execute(sa.text(f"ALTER TABLE {table.name} MODIFY COLUMN {col.name} {col_type} {null}"))
+                print(f"  + {table.name}.{col.name} now allows {', '.join(missing)}")
+
+
 def main() -> None:
     print("Loopstitch migration")
     print("1/6 creating missing tables...")
@@ -256,6 +284,8 @@ def main() -> None:
     ensure_notifications_table()
     print("4/6 adding missing columns...")
     ensure_columns()
+    print("4.5/6 widening enum columns (MySQL)...")
+    ensure_enum_values()
     print("5/6 adding color variants...")
     ensure_product_color_schema()
     print("6/6 seeding default settings...")
