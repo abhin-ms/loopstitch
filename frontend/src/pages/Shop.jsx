@@ -58,23 +58,24 @@ export default function Shop() {
         <p className="text-sm text-slate mt-3 max-w-xl">Every tee is cut unisex with a relaxed, dropped-shoulder fit. Not sure of your size? <a href="/faq#sizing" className="underline underline-offset-4 hover:text-acid">See the size help</a>.</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
-        <div className="flex gap-2 flex-1 lg:justify-end flex-wrap">
+      {/* One row: filter chips left, search + sort right (stacks on phones) */}
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex gap-2 flex-wrap items-center">
+          <button onClick={() => setInStockOnly((v) => !v)} aria-pressed={inStockOnly} className={chip(inStockOnly)}>In stock</button>
+          <button onClick={() => setSavedOnly((v) => !v)} aria-pressed={savedOnly} className={chip(savedOnly)}>♥ Saved ({wishlist.ids.length})</button>
+          {filtersActive && (
+            <button onClick={() => { setQuery(''); setInStockOnly(false); setSavedOnly(false) }} className="font-mono text-xs uppercase tracking-widest text-slate hover:text-riot px-2">Clear</button>
+          )}
+        </div>
+        <div className="flex gap-2 sm:ml-auto">
           <label className="sr-only" htmlFor="shop-search">Search products</label>
-          <input id="shop-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="field-input sm:max-w-56" />
+          <input id="shop-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="field-input flex-1 min-w-0 sm:flex-none sm:w-56!" />
           <label className="sr-only" htmlFor="shop-sort">Sort products</label>
-          <select id="shop-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="field-input sm:w-auto">
+          {/* .field-input sets width:100%; the sort box should only be as wide as its label */}
+          <select id="shop-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="field-input shrink-0 w-auto!">
             {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-      </div>
-
-      <div className="flex gap-2 flex-wrap mb-8">
-        <button onClick={() => setInStockOnly((v) => !v)} aria-pressed={inStockOnly} className={chip(inStockOnly)}>In stock</button>
-        <button onClick={() => setSavedOnly((v) => !v)} aria-pressed={savedOnly} className={chip(savedOnly)}>♥ Saved ({wishlist.ids.length})</button>
-        {filtersActive && (
-          <button onClick={() => { setQuery(''); setInStockOnly(false); setSavedOnly(false) }} className="font-mono text-xs uppercase tracking-widest text-slate hover:text-riot px-2">Clear</button>
-        )}
       </div>
 
       <p className="font-mono text-[11px] text-slate mb-6" role="status" aria-live="polite">

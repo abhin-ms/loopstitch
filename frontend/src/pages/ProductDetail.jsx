@@ -11,6 +11,7 @@ import ProductReviews from '../components/ProductReviews'
 import StarRating from '../components/StarRating'
 import ProductDetails from '../components/ProductDetails'
 import RecentlyViewed from '../components/RecentlyViewed'
+import AddedToCart from '../components/AddedToCart'
 import { pushRecent } from '../utils/recentlyViewed'
 import { removeServerLd } from '../utils/serverLd'
 import { useWishlist } from '../context/WishlistContext'
@@ -29,6 +30,8 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [justAdded, setJustAdded] = useState(false)
+  const [addedItem, setAddedItem] = useState(null)
+  const closeAdded = useCallback(() => setAddedItem(null), [])
   const [guideOpen, setGuideOpen] = useState(false)
   const [rating, setRating] = useState({ average: 0, count: 0 })
   const [zoom, setZoom] = useState(null)
@@ -116,6 +119,14 @@ export default function ProductDetail() {
     if (!selectedSize || maxForSize < 1) return
     addItem(product, selectedColor, selectedSize, quantity, maxForSize)
     haptic(20)
+    setAddedItem({
+      key: Date.now(),
+      name: product.name,
+      color: colors.length > 1 ? selectedColor.name : '',
+      size: selectedSize,
+      quantity,
+      image: images[0]?.url || '',
+    })
     setJustAdded(true)
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => setJustAdded(false), 1800)
@@ -215,7 +226,7 @@ export default function ProductDetail() {
               <span className="font-mono text-xs uppercase tracking-widest text-slate">Size · <button type="button" onClick={() => setGuideOpen(true)} className="underline underline-offset-4 hover:text-acid py-2">Size guide</button></span>
               {selectedSize && (
                 <span className="font-mono text-xs text-slate">
-                  {maxForSize > 0 ? `${maxForSize} in stock` : 'Locked — sold out'}
+                  {maxForSize > 0 ? `${maxForSize} in stock` : 'Sold out'}
                 </span>
               )}
             </div>
@@ -256,7 +267,7 @@ export default function ProductDetail() {
                   : 'bg-riot text-ink hover:bg-acid'
             }`}
           >
-            {!selectedSize ? 'Select a size' : maxForSize < 1 ? 'Locked — sold out' : justAdded ? 'Added ✓' : 'Add to cart'}
+            {!selectedSize ? 'Select a size' : maxForSize < 1 ? 'Sold out' : justAdded ? 'Added ✓' : 'Add to cart'}
           </button>
 
           <div className="flex gap-3 mt-4">
@@ -301,6 +312,7 @@ export default function ProductDetail() {
         </button>
       </div>
       <div className="md:hidden h-16" aria-hidden="true" />
+      <AddedToCart item={addedItem} onClose={closeAdded} />
     </div>
   )
 }

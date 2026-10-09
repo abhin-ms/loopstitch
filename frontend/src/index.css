@@ -8,7 +8,7 @@
   --color-riot: #FF3B5C;
   --color-acid: #E8FF52;
   --color-slate: #8A8A93;
-  --color-slate-dim: #4E4E56;
+  --color-slate-dim: #75757E; /* ~4:1 on ink: struck prices, captions */
 
   --font-display: 'Anton', sans-serif;
   --font-body: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
@@ -24,7 +24,7 @@
   --color-riot: #D62445;
   --color-acid: #5F7A00;
   --color-slate: #6B6B73;
-  --color-slate-dim: #ABABAF;
+  --color-slate-dim: #808086;
 }
 
 * {

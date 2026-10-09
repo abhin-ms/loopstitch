@@ -38,8 +38,8 @@ export default function Footer() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-panel-2 px-5 py-5 text-center font-mono text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-widest text-slate-dim leading-relaxed">
-        © {new Date().getFullYear()} LOOPSTITCH CO. — LIMITED DROPS AND CUSTOM PRINTS.
+      <div className="border-t border-panel-2 px-5 py-5 text-center font-mono text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-widest text-slate leading-relaxed">
+        © {new Date().getFullYear()} LOOPSTITCH — LIMITED DROPS AND CUSTOM PRINTS.
       </div>
     </footer>
   )

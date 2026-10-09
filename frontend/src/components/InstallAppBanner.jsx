@@ -3,6 +3,25 @@ import useInstallPrompt from '../hooks/useInstallPrompt'
 import InstallAppModal from './InstallAppModal'
 
 const DISMISS_KEY = 'loopstitch_install_banner_dismissed'
+const VISITS_KEY = 'loopstitch_visits'
+const SESSION_KEY = 'loopstitch_visit_counted'
+
+// Phones only, and only from the visitor's 2nd visit — a first-time visitor
+// should see the store, not an install pitch stacked under the offer bar.
+function isReturningPhoneVisitor() {
+  if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return false
+  try {
+    let visits = Number(localStorage.getItem(VISITS_KEY) || 0)
+    if (!sessionStorage.getItem(SESSION_KEY)) {
+      visits += 1
+      localStorage.setItem(VISITS_KEY, String(visits))
+      sessionStorage.setItem(SESSION_KEY, '1')
+    }
+    return visits >= 2
+  } catch {
+    return false
+  }
+}
 
 export default function InstallAppBanner() {
   const { canInstall, isIOS, isStandalone, promptInstall } = useInstallPrompt()
@@ -14,6 +33,7 @@ export default function InstallAppBanner() {
     }
   })
   const [showIOSModal, setShowIOSModal] = useState(false)
+  const [eligible] = useState(isReturningPhoneVisitor)
 
   useEffect(() => {
     if (isStandalone) setDismissed(true)
@@ -35,7 +55,7 @@ export default function InstallAppBanner() {
     }
   }
 
-  if (dismissed || isStandalone || !(canInstall || isIOS)) return null
+  if (!eligible || dismissed || isStandalone || !(canInstall || isIOS)) return null
 
   return (
     <>

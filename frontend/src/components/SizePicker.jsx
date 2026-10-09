@@ -11,6 +11,7 @@ export default function SizePicker({ sizes, selected, onSelect }) {
             disabled={isOut}
             onClick={() => onSelect(s.size)}
             aria-pressed={isSelected}
+            aria-label={isOut ? `Size ${s.size}, sold out` : `Size ${s.size}`}
             className={`relative w-14 h-12 font-mono text-sm border transition-all
               ${isOut
                 ? 'border-panel-2 text-slate-dim cursor-not-allowed line-through overflow-hidden'
@@ -20,8 +21,8 @@ export default function SizePicker({ sizes, selected, onSelect }) {
           >
             {s.size}
             {isOut && (
-              <span className="absolute inset-0 flex items-center justify-center bg-ink/60 text-[8px] tracking-wider font-mono not-italic">
-                LOCKED
+              <span className="absolute bottom-0.5 inset-x-0 text-center text-[8px] tracking-wider font-mono no-underline uppercase">
+                Sold out
               </span>
             )}
           </button>
