@@ -5,7 +5,6 @@ import { useCustomerAuth } from '../context/CustomerAuthContext'
 import Loader from '../components/Loader'
 import TshirtCustomizer, { BODY_FRONT, COLLAR_FRONT, NECKHOLE_FRONT, getStageBg, getLuminance } from '../components/custom/TshirtCustomizer'
 import PriceSummary from '../components/custom/PriceSummary'
-import LoginModal from '../components/LoginModal'
 
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
 
@@ -46,7 +45,6 @@ export default function Customize() {
   const [colors, setColors] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState(null)
-  const [loginOpen, setLoginOpen] = useState(false)
   const [step, setStep] = useState(1)
   const [selections, setSelections] = useState([])
   const [designs, setDesigns] = useState([])
@@ -198,10 +196,6 @@ export default function Customize() {
 
   const handleSubmitOrder = async (event) => {
     event.preventDefault()
-    if (!isAuthenticated) {
-      setLoginOpen(true)
-      return
-    }
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -399,7 +393,6 @@ export default function Customize() {
         </div>
       )}
 
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={() => setLoginOpen(false)} />
     </div>
   )
 }
