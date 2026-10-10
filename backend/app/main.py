@@ -2164,6 +2164,12 @@ def admin_launch_alerts_test(payload: schemas.LaunchAlertTest, db: Session = Dep
     return {"detail": f"Test {label} sent by {channel} to {payload.contact}"}
 
 
+@app.post("/api/admin/launch-alerts/welcome-now")
+def admin_launch_alerts_welcome_now(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Send 'You're on the list' to everyone who hasn't had it yet."""
+    return launch_alerts.send_welcome_backlog(db)
+
+
 @app.post("/api/admin/launch-alerts/send-now")
 def admin_launch_alerts_send_now(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     """Send the launch reminder now to everyone not yet notified (also retries failures)."""

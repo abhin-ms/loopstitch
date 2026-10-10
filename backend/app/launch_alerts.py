@@ -230,6 +230,51 @@ def send_welcome(subscriber_id: int) -> None:
         db.close()
 
 
+def send_welcome_backlog(db: Session) -> Dict[str, int]:
+    """'You're on the list' for everyone who signed up before it was switched on
+    (skips anyone already welcomed, already reminded, or unsubscribed)."""
+    subs = (
+        db.query(models.Subscriber)
+        .filter(
+            models.Subscriber.welcomed_at.is_(None),
+            models.Subscriber.notified_at.is_(None),
+            models.Subscriber.unsubscribed.isnot(True),
+        )
+        .order_by(models.Subscriber.id)
+        .all()
+    )
+    when = launch_label(_settings(db))
+    counts = {"sent": 0, "failed": 0}
+    smtp = None
+    try:
+        for sub in subs:
+            try:
+                if sub.kind == "email" and smtp is None:
+                    smtp = mailer.connect()
+                _send_one(sub, "welcome", when, smtp)
+                sub.welcomed_at = _utcnow()
+                sub.notify_error = None
+                counts["sent"] += 1
+            except Exception as exc:
+                sub.notify_error = f"Welcome: {exc}"[:500]
+                counts["failed"] += 1
+                logger.warning("Welcome to subscriber %s failed: %s", sub.id, exc)
+                if sub.kind == "email" and smtp is not None:
+                    try:
+                        smtp.quit()
+                    except Exception:
+                        pass
+                    smtp = None
+            db.commit()
+    finally:
+        if smtp is not None:
+            try:
+                smtp.quit()
+            except Exception:
+                pass
+    return counts
+
+
 def send_pending(db: Session, ids: Optional[list] = None) -> Dict[str, int]:
     """1-minute reminder to every subscriber not yet notified (or just `ids`). Returns counts."""
     q = db.query(models.Subscriber).filter(

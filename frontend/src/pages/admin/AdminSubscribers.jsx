@@ -56,6 +56,22 @@ export default function AdminSubscribers() {
     }
   }
 
+  const welcomeNow = async () => {
+    const pending = rows.filter((r) => !r.welcomed_at && !r.notified_at && !r.unsubscribed).length
+    if (!window.confirm(`Send "You're on the list" now to ${pending} subscriber${pending === 1 ? '' : 's'} who haven't had it?`)) return
+    setBusy('welcome-all')
+    setMsg(null)
+    try {
+      const res = await client.post('/api/admin/launch-alerts/welcome-now')
+      setMsg({ ok: res.data.failed === 0, text: `Welcome sent to ${res.data.sent}${res.data.failed ? ` · ${res.data.failed} failed (see list)` : ''}.` })
+      load()
+    } catch (err) {
+      setMsg({ ok: false, text: err.response?.data?.detail || 'Sending failed.' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const exportCsv = () => {
     const csv = ['contact,type,source,signed_up,notified', ...rows.map((r) => `${r.contact},${r.kind},${r.source},${r.created_at},${r.notified_at || ''}`)].join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
@@ -114,6 +130,9 @@ export default function AdminSubscribers() {
             </button>
             <button type="submit" disabled={!!busy} className="border border-acid text-acid font-mono text-[11px] uppercase tracking-widest px-4 py-2.5 hover:bg-acid hover:text-ink transition-colors disabled:opacity-50">
               {busy === 'reminder' ? 'Sending…' : 'Test launch reminder'}
+            </button>
+            <button type="button" onClick={welcomeNow} disabled={!!busy || alerts.welcomed + alerts.sent >= alerts.total} className="border border-paper text-paper font-mono text-[11px] uppercase tracking-widest px-4 py-2.5 hover:border-acid hover:text-acid transition-colors disabled:opacity-50">
+              {busy === 'welcome-all' ? 'Sending…' : 'Send welcome to all'}
             </button>
             <button type="button" onClick={sendNow} disabled={!!busy || alerts.total === alerts.sent} className="bg-riot text-ink font-mono text-[11px] uppercase tracking-widest px-4 py-2.5 hover:bg-acid transition-colors disabled:opacity-50">
               {busy === 'send' ? 'Sending…' : 'Send reminder to all now'}
