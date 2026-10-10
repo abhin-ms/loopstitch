@@ -20,4 +20,6 @@ COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# run DB migrations on every start, then nginx + API + courier worker
+RUN chmod +x /app/backend/docker-entrypoint.sh
+CMD ["/app/backend/docker-entrypoint.sh"]
