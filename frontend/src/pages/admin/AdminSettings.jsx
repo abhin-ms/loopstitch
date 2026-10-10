@@ -34,6 +34,7 @@ export default function AdminSettings() {
         launch_mode: !form.launch_mode,
         launch_date: toIso(form.launch_date),
         launch_message: form.launch_message || '',
+        launch_auto_open: !!form.launch_auto_open,
       })
       setForm(fromApi(res.data))
     } catch (err) {
@@ -63,6 +64,7 @@ export default function AdminSettings() {
         cod_enabled: form.cod_enabled,
         launch_date: toIso(form.launch_date),
         launch_message: form.launch_message || '',
+        launch_auto_open: !!form.launch_auto_open,
         ship_auto_pickup: form.ship_auto_pickup,
         ship_pickup_location: form.ship_pickup_location || '',
         ship_days_standard: Number(form.ship_days_standard),
@@ -119,6 +121,17 @@ export default function AdminSettings() {
               value={form.launch_date || ''} onChange={handleChange}
               className="w-full bg-panel border border-panel-2 px-3.5 py-2.5 text-sm text-paper focus:border-acid outline-none font-mono"
             />
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" name="launch_auto_open" checked={!!form.launch_auto_open} onChange={handleChange} className="accent-acid mt-0.5" />
+            <div>
+              <span className="font-mono text-sm text-paper">Open the store automatically when the countdown ends</span>
+              <p className="font-mono text-[11px] text-slate">
+                {form.launch_auto_open
+                  ? 'At the launch time visitors get the full store — no need to press Disable. Click "Save settings" to apply.'
+                  : 'Off — the launching soon page stays up until you press Disable.'}
+              </p>
+            </div>
           </label>
           <label className="block">
             <span className="font-mono text-[11px] uppercase tracking-widest text-slate block mb-1.5">Message (optional)</span>

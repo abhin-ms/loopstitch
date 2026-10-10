@@ -61,7 +61,7 @@ export default function InstallAppBanner() {
     <>
       <div className="relative bg-riot text-ink border-b border-panel-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-2.5 flex items-center gap-3">
-          <img src="/icon-192.png" alt="" className="w-7 h-7 shrink-0" />
+          <img src="/icon-192.png?v=2" alt="" className="w-7 h-7 shrink-0" />
           <p className="flex-1 min-w-0 font-mono text-xs sm:text-[13px] font-semibold truncate">
             Get the Loopstitch app — faster shop &amp; checkout on your phone.
           </p>

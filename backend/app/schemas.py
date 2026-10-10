@@ -180,6 +180,10 @@ class OrderOut(BaseModel):
         from_attributes = True
 
 
+class IdList(BaseModel):
+    ids: List[int] = Field(min_length=1, max_length=500)
+
+
 class OrderStatusUpdate(BaseModel):
     status: models.OrderStatus
 
@@ -341,6 +345,7 @@ class SettingsOut(BaseModel):
     launch_mode: bool = False
     launch_date: str = ""         # ISO datetime for the countdown, "" = no countdown
     launch_message: str = ""
+    launch_auto_open: bool = False  # open the store by itself when the countdown ends
     ship_configured: bool = False   # DELHIVERY_API_TOKEN present on the server
     ship_auto_pickup: bool = True
     ship_pickup_location: str = ""
@@ -359,6 +364,7 @@ class SettingsUpdate(BaseModel):
     launch_mode: Optional[bool] = None
     launch_date: Optional[str] = Field(default=None, max_length=40)
     launch_message: Optional[str] = Field(default=None, max_length=200)
+    launch_auto_open: Optional[bool] = None
     ship_auto_pickup: Optional[bool] = None
     ship_pickup_location: Optional[str] = Field(default=None, max_length=150)
     ship_days_standard: Optional[int] = Field(default=None, ge=1, le=30)

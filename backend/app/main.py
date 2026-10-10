@@ -839,6 +839,40 @@ def admin_list_orders(db: Session = Depends(get_db), current: models.Admin = Dep
     return orders
 
 
+def _delete_order(db: Session, order: models.Order) -> None:
+    """Remove an order for good: its items, WhatsApp notifications and design links go with it.
+    Stock + coupon use come back only if the parcel never left (pending / paid);
+    a booked-but-undelivered Delhivery shipment is cancelled too."""
+    if order.status in (models.OrderStatus.pending, models.OrderStatus.paid):
+        order_lifecycle.release_stock(db, order)
+    if order.awb and order.status != models.OrderStatus.delivered:
+        courier.cancel_for_order(order)  # best effort; never blocks the delete
+    db.query(models.Notification).filter(models.Notification.order_id == order.id).delete(synchronize_session=False)
+    db.query(models.CustomTshirtDesign).filter(models.CustomTshirtDesign.order_id == order.id).delete(synchronize_session=False)
+    db.delete(order)  # order items cascade
+
+
+@app.delete("/api/admin/orders/{order_id}")
+def admin_delete_order(order_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).with_for_update().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    _delete_order(db, order)
+    db.commit()
+    logger.info("Admin %s deleted order %s", current.username, order.order_number)
+    return {"deleted": 1}
+
+
+@app.post("/api/admin/orders/bulk-delete")
+def admin_bulk_delete_orders(payload: schemas.IdList, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    orders = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id.in_(payload.ids)).with_for_update().all()
+    for order in orders:
+        _delete_order(db, order)
+    db.commit()
+    logger.info("Admin %s deleted %s orders", current.username, len(orders))
+    return {"deleted": len(orders)}
+
+
 @app.patch("/api/admin/orders/{order_id}/status", response_model=schemas.OrderOut)
 def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     order = db.query(models.Order).options(joinedload(models.Order.items)).filter(models.Order.id == order_id).first()
@@ -923,6 +957,7 @@ def _build_settings_out(db: Session) -> schemas.SettingsOut:
         launch_mode=raw.get("launch_mode", "false") == "true",
         launch_date=raw.get("launch_date", ""),
         launch_message=raw.get("launch_message", ""),
+        launch_auto_open=raw.get("launch_auto_open", "false") == "true",
         ship_configured=delhivery_helper.is_configured(),
         ship_auto_pickup=raw.get("ship_auto_pickup", "true") == "true",
         ship_pickup_location=raw.get("ship_pickup_location", ""),
@@ -934,12 +969,27 @@ def _build_settings_out(db: Session) -> schemas.SettingsOut:
     )
 
 
+def _launch_countdown_over(raw: dict) -> bool:
+    """True once the admin-set launch time has passed (launch_date is stored as UTC ISO)."""
+    try:
+        when = datetime.datetime.fromisoformat(raw.get("launch_date", "").replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc) >= when
+
+
 @app.get("/api/settings/launch", response_model=schemas.PublicLaunchSettings)
 def public_launch_settings(db: Session = Depends(get_db)):
-    # When launch_mode is on the storefront shows only the "launching soon" page
+    # When launch_mode is on the storefront shows only the "launching soon" page —
+    # unless auto-open is ticked and the countdown has run out, then the store opens by itself
     raw = _get_all_settings(db)
+    launch_on = raw.get("launch_mode", "false") == "true"
+    if launch_on and raw.get("launch_auto_open", "false") == "true" and _launch_countdown_over(raw):
+        launch_on = False
     return schemas.PublicLaunchSettings(
-        launch_mode=raw.get("launch_mode", "false") == "true",
+        launch_mode=launch_on,
         launch_date=raw.get("launch_date", ""),
         launch_message=raw.get("launch_message", ""),
     )
@@ -981,6 +1031,8 @@ def admin_update_settings(payload: schemas.SettingsUpdate, db: Session = Depends
         set_setting(db, "launch_date", payload.launch_date.strip())
     if payload.launch_message is not None:
         set_setting(db, "launch_message", payload.launch_message.strip())
+    if payload.launch_auto_open is not None:
+        set_setting(db, "launch_auto_open", "true" if payload.launch_auto_open else "false")
     if payload.ship_auto_pickup is not None:
         set_setting(db, "ship_auto_pickup", "true" if payload.ship_auto_pickup else "false")
     if payload.ship_pickup_location is not None:
@@ -1299,6 +1351,22 @@ def admin_list_notifications(
     return schemas.NotificationListResponse(items=items, total=total)
 
 
+@app.delete("/api/admin/notifications/{notification_id}")
+def admin_delete_notification(notification_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    deleted = db.query(models.Notification).filter(models.Notification.id == notification_id).delete(synchronize_session=False)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.commit()
+    return {"deleted": 1}
+
+
+@app.post("/api/admin/notifications/bulk-delete")
+def admin_bulk_delete_notifications(payload: schemas.IdList, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    deleted = db.query(models.Notification).filter(models.Notification.id.in_(payload.ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
+
+
 @app.get("/api/admin/notifications/{notification_id}", response_model=schemas.NotificationOut)
 def admin_get_notification(
     notification_id: int,
@@ -1594,8 +1662,9 @@ def admin_delete_coupon(coupon_id: int, db: Session = Depends(get_db), current: 
 def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     total_products = db.query(models.Product).count()
     total_orders = db.query(models.Order).count()
+    # only real sales: unpaid (pending), failed and cancelled orders are not revenue
     revenue_sum = db.query(func.coalesce(func.sum(models.Order.total), 0.0)).filter(
-        models.Order.status != models.OrderStatus.cancelled
+        models.Order.status.in_([models.OrderStatus.paid, models.OrderStatus.shipped, models.OrderStatus.delivered])
     ).scalar()
     low_stock = db.query(models.ProductSize).filter(models.ProductSize.stock <= 3, models.ProductSize.stock > 0).count()
     out_of_stock = db.query(models.ProductSize).filter(models.ProductSize.stock == 0).count()

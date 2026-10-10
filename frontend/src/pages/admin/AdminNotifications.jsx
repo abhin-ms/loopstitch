@@ -20,6 +20,8 @@ export default function AdminNotifications() {
   const [statusFilter, setStatusFilter] = useState('')
   const [error, setError] = useState(null)
   const [resending, setResending] = useState(null)
+  const [selected, setSelected] = useState(() => new Set())
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => {
     const params = new URLSearchParams({ page, per_page: 20 })
@@ -28,11 +30,38 @@ export default function AdminNotifications() {
       .then((res) => {
         setNotifications(res.data.items)
         setTotal(res.data.total)
+        setSelected(new Set())  // a fresh page / filter starts with nothing ticked
       })
       .catch(() => setError('Failed to load notifications'))
   }
 
   useEffect(load, [page, statusFilter])
+
+  const toggleSelect = (id) => setSelected((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  // Only removes the log entry here; a message already sent stays on the customer's phone
+  const deleteNotifications = async (ids) => {
+    if (!ids.length) return
+    if (!confirm(`Delete ${ids.length === 1 ? 'this notification' : `${ids.length} notifications`} from the log? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      if (ids.length === 1) await client.delete(`/api/admin/notifications/${ids[0]}`)
+      else await client.post('/api/admin/notifications/bulk-delete', { ids })
+      setSelected(new Set())
+      // stepping back a page if this one is now empty
+      if (ids.length >= notifications.length && page > 1) setPage((p) => p - 1)
+      else load()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete.')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const handleResend = async (n) => {
     if (!confirm(`Resend WhatsApp message to ${n.customer_name}?`)) return
@@ -73,6 +102,29 @@ export default function AdminNotifications() {
         ))}
       </div>
 
+      {notifications.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 font-mono text-[11px] uppercase tracking-widest">
+          <label className="flex items-center gap-2 text-paper cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-acid w-4 h-4"
+              checked={selected.size === notifications.length}
+              onChange={(e) => setSelected(e.target.checked ? new Set(notifications.map((n) => n.id)) : new Set())}
+            />
+            Select all on this page
+          </label>
+          {selected.size > 0 && (
+            <button
+              onClick={() => deleteNotifications([...selected])}
+              disabled={deleting}
+              className="ml-auto bg-riot text-ink px-3 py-2 hover:bg-acid transition-colors disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : `Delete selected (${selected.size})`}
+            </button>
+          )}
+        </div>
+      )}
+
       {notifications.length === 0 ? (
         <p className="font-mono text-sm text-slate">No notifications{statusFilter ? ` with status "${statusFilter}"` : ''}.</p>
       ) : (
@@ -82,6 +134,13 @@ export default function AdminNotifications() {
             return (
               <div key={n.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4 justify-between">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select notification for order ${n.order_number}`}
+                    className="accent-acid w-4 h-4 shrink-0"
+                    checked={selected.has(n.id)}
+                    onChange={() => toggleSelect(n.id)}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-sm text-paper">
                       #{n.order_number}
@@ -117,6 +176,13 @@ export default function AdminNotifications() {
                         {resending === n.id ? 'Sending…' : 'Resend'}
                       </button>
                     )}
+                    <button
+                      onClick={() => deleteNotifications([n.id])}
+                      disabled={deleting}
+                      className="font-mono text-[11px] uppercase tracking-widest text-riot hover:underline disabled:opacity-50 px-2 py-2"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>

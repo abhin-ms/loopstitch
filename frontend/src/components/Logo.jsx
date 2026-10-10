@@ -5,7 +5,7 @@ export default function Logo({ className = 'h-11 w-11' }) {
   const { theme } = useTheme()
   return (
     <img
-      src={theme === 'light' ? '/logo-light.webp' : '/logo-dark.webp'}
+      src={theme === 'light' ? '/logo-light.webp?v=2' : '/logo-dark.webp?v=2'}
       alt="Loopstitch"
       width="256"
       height="256"

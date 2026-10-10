@@ -16,15 +16,126 @@
 @media (max-width: 1023px) and (max-height: 620px) {
   .launch-short-hide { display: none; }
 }
-
-/* Soft oval fade so the video's edges dissolve into the page background */
-.launch-video {
-  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
-  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 55%, transparent 100%);
+/* With the countdown card showing, the intro text repeats it — drop it on
+   shorter phones so the character video keeps its space */
+@media (max-width: 1023px) and (max-height: 760px) {
+  .launch-hide-with-card { display: none; }
 }
-.launch-video::-webkit-media-controls,
-.launch-video::-webkit-media-controls-start-playback-button {
-  display: none !important;
+
+/* ---------- Launch countdown card (manga panel) ---------- */
+.launch-card {
+  box-shadow: 6px 6px 0 var(--color-riot);
+}
+.launch-speedlines {
+  position: absolute;
+  inset: -60%;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(243, 241, 234, 0.07) 0deg 2deg, transparent 2deg 9deg);
+  animation: launch-spin 50s linear infinite;
+  pointer-events: none;
+}
+@keyframes launch-spin {
+  to { transform: rotate(360deg); }
+}
+.launch-kanji {
+  position: absolute;
+  right: -0.15em;
+  bottom: -0.25em;
+  font-size: 5.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-riot);
+  opacity: 0.12;
+  pointer-events: none;
+}
+.launch-sticker {
+  transform: rotate(-5deg);
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+.launch-digit {
+  text-shadow: 2px 2px 0 var(--color-riot);
+  animation: launch-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes launch-pop {
+  0% { transform: scale(1.3) translateY(-3px); color: var(--color-acid); }
+  100% { transform: none; }
+}
+.launch-colon {
+  animation: launch-blink 1s steps(1) infinite;
+}
+@keyframes launch-blink {
+  50% { opacity: 0.2; }
+}
+.launch-impact {
+  text-shadow: 3px 3px 0 var(--color-riot);
+  animation: launch-shake 0.5s ease-in-out infinite alternate;
+}
+@keyframes launch-shake {
+  from { transform: rotate(-2deg) scale(1); }
+  to { transform: rotate(2deg) scale(1.05); }
+}
+
+/* ---------- Hero emblem (replaces the video) ---------- */
+.launch-emblem-glow {
+  position: absolute;
+  inset: 6%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 59, 92, 0.5), rgba(255, 59, 92, 0) 65%);
+  filter: blur(18px);
+  animation: launch-glow 3.2s ease-in-out infinite;
+}
+@keyframes launch-glow {
+  50% { opacity: 0.55; transform: scale(1.08); }
+}
+.launch-emblem-ring { animation: launch-spin 30s linear infinite; }
+.launch-emblem-ring circle { animation: launch-sew 1.2s linear infinite; }
+@keyframes launch-sew {
+  to { stroke-dashoffset: -24; }
+}
+.launch-emblem-ring2 { animation: launch-spin 48s linear infinite reverse; }
+/* the "needle pin" bead travelling round the stitch ring */
+.launch-orbit {
+  position: absolute;
+  inset: 0;
+  animation: launch-spin 6s linear infinite;
+}
+.launch-orbit::before {
+  content: '';
+  position: absolute;
+  top: 1%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 9999px;
+  background: #ff4d4d;
+  box-shadow: 0 0 10px 4px rgba(255, 59, 92, 0.75);
+}
+.launch-spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: #ff6b6b;
+  box-shadow: 0 0 6px 2px rgba(255, 59, 92, 0.7);
+  opacity: 0;
+  animation: launch-spark 3.4s ease-in infinite;
+}
+@keyframes launch-spark {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-48px) scale(0.2); }
+}
+.launch-emblem-logo {
+  position: absolute;
+  inset: 9%;
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(255, 59, 92, 0.35));
+  animation: launch-float 4s ease-in-out infinite;
+}
+@keyframes launch-float {
+  50% { transform: translateY(-6px); }
 }
 
 .launch-marquee {
@@ -59,7 +170,18 @@
 @media (prefers-reduced-motion: reduce) {
   .launch-marquee,
   .launch-title span,
-  .launch-dot {
+  .launch-dot,
+  .launch-speedlines,
+  .launch-digit,
+  .launch-colon,
+  .launch-impact,
+  .launch-emblem-glow,
+  .launch-emblem-ring,
+  .launch-emblem-ring circle,
+  .launch-emblem-ring2,
+  .launch-orbit,
+  .launch-emblem-logo {
     animation: none !important;
   }
+  .launch-spark { display: none; }
 }
