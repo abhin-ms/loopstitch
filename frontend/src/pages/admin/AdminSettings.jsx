@@ -35,6 +35,7 @@ export default function AdminSettings() {
         launch_date: toIso(form.launch_date),
         launch_message: form.launch_message || '',
         launch_auto_open: !!form.launch_auto_open,
+        launch_alerts_enabled: !!form.launch_alerts_enabled,
       })
       setForm(fromApi(res.data))
     } catch (err) {
@@ -65,6 +66,7 @@ export default function AdminSettings() {
         launch_date: toIso(form.launch_date),
         launch_message: form.launch_message || '',
         launch_auto_open: !!form.launch_auto_open,
+        launch_alerts_enabled: !!form.launch_alerts_enabled,
         ship_auto_pickup: form.ship_auto_pickup,
         ship_pickup_location: form.ship_pickup_location || '',
         ship_days_standard: Number(form.ship_days_standard),
@@ -130,6 +132,17 @@ export default function AdminSettings() {
                 {form.launch_auto_open
                   ? 'At the launch time visitors get the full store — no need to press Disable. Click "Save settings" to apply.'
                   : 'Off — the launching soon page stays up until you press Disable.'}
+              </p>
+            </div>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" name="launch_alerts_enabled" checked={!!form.launch_alerts_enabled} onChange={handleChange} className="accent-acid mt-0.5" />
+            <div>
+              <span className="font-mono text-sm text-paper">Message subscribers (email / WhatsApp)</span>
+              <p className="font-mono text-[11px] text-slate">
+                {form.launch_alerts_enabled
+                  ? '"You\'re on the list" right after they subscribe, and "1 minute to go" one minute before the launch time. Send tests from Admin → Subscribers first.'
+                  : 'Off — subscribers get no automatic messages.'}
               </p>
             </div>
           </label>

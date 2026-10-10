@@ -1,3 +1,4 @@
+import hmac
 import os
 import re
 import secrets
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Request, status
+from fastapi import BackgroundTasks, FastAPI, Depends, HTTPException, UploadFile, File, Form, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, HTMLResponse
@@ -26,6 +27,8 @@ from . import razorpay as razorpay_helper
 from . import whatsapp as whatsapp_helper
 from . import delhivery as delhivery_helper
 from . import courier
+from . import launch_alerts
+from . import mailer
 from . import customer_auth
 from . import seo
 from . import ratelimit
@@ -958,6 +961,7 @@ def _build_settings_out(db: Session) -> schemas.SettingsOut:
         launch_date=raw.get("launch_date", ""),
         launch_message=raw.get("launch_message", ""),
         launch_auto_open=raw.get("launch_auto_open", "false") == "true",
+        launch_alerts_enabled=raw.get("launch_alerts_enabled", "false") == "true",
         ship_configured=delhivery_helper.is_configured(),
         ship_auto_pickup=raw.get("ship_auto_pickup", "true") == "true",
         ship_pickup_location=raw.get("ship_pickup_location", ""),
@@ -1027,12 +1031,23 @@ def admin_update_settings(payload: schemas.SettingsUpdate, db: Session = Depends
         set_setting(db, "cod_enabled", "true" if payload.cod_enabled else "false")
     if payload.launch_mode is not None:
         set_setting(db, "launch_mode", "true" if payload.launch_mode else "false")
+    before = _get_all_settings(db)
+    rearm_reminder = False  # set launch_alerts_sent_at once at the end (no autoflush between set_setting calls)
     if payload.launch_date is not None:
+        if payload.launch_date.strip() != before.get("launch_date", ""):
+            rearm_reminder = True  # new launch time: the reminder fires again
         set_setting(db, "launch_date", payload.launch_date.strip())
     if payload.launch_message is not None:
         set_setting(db, "launch_message", payload.launch_message.strip())
     if payload.launch_auto_open is not None:
         set_setting(db, "launch_auto_open", "true" if payload.launch_auto_open else "false")
+    if payload.launch_alerts_enabled is not None:
+        was_on = before.get("launch_alerts_enabled") == "true"
+        set_setting(db, "launch_alerts_enabled", "true" if payload.launch_alerts_enabled else "false")
+        if payload.launch_alerts_enabled and not was_on:
+            rearm_reminder = True  # re-arm the automatic reminder
+    if rearm_reminder:
+        set_setting(db, "launch_alerts_sent_at", "")
     if payload.ship_auto_pickup is not None:
         set_setting(db, "ship_auto_pickup", "true" if payload.ship_auto_pickup else "false")
     if payload.ship_pickup_location is not None:
@@ -2064,7 +2079,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 @app.post("/api/subscribe")
-def subscribe(payload: schemas.SubscribeIn, request: Request, db: Session = Depends(get_db)):
+def subscribe(payload: schemas.SubscribeIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     ratelimit.limit(request, "subscribe", max_hits=10, window_seconds=60 * 60)
     contact = payload.contact.strip().lower()
     if _EMAIL_RE.match(contact):
@@ -2074,16 +2089,96 @@ def subscribe(payload: schemas.SubscribeIn, request: Request, db: Session = Depe
         if len(digits) < 10 or len(digits) > 13:
             raise HTTPException(status_code=422, detail="Enter a valid email or phone number.")
         contact, kind = digits[-10:], "phone"
-    if not db.query(models.Subscriber).filter(models.Subscriber.contact == contact).first():
-        db.add(models.Subscriber(contact=contact, kind=kind, source=payload.source))
+    existing = db.query(models.Subscriber).filter(models.Subscriber.contact == contact).first()
+    if not existing:
+        sub = models.Subscriber(contact=contact, kind=kind, source=payload.source)
+        db.add(sub)
+        db.commit()
+        # "You're on the list" email / WhatsApp — after the response, so sign-up stays instant
+        background.add_task(launch_alerts.send_welcome, sub.id)
+    elif existing.unsubscribed:  # signing up again opts back in
+        existing.unsubscribed = False
         db.commit()
     return {"detail": "You're on the list."}
+
+
+def _unsubscribe(s: int, t: str, db: Session) -> bool:
+    sub = db.query(models.Subscriber).filter(models.Subscriber.id == s).first()
+    if not sub or not hmac.compare_digest(t, launch_alerts.unsubscribe_token(sub.id, sub.contact)):
+        return False
+    sub.unsubscribed = True
+    db.commit()
+    return True
+
+
+@app.get("/api/unsubscribe", response_class=HTMLResponse)
+def unsubscribe_page(s: int = 0, t: str = "", db: Session = Depends(get_db)):
+    """Link at the bottom of launch emails. No login: the token proves it's their link."""
+    ok = _unsubscribe(s, t, db)
+    message = "You're unsubscribed. We won't email you about drops again." if ok else "This unsubscribe link is invalid or has expired."
+    return HTMLResponse(
+        f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loopstitch</title></head><body style="margin:0;background:#0B0B0D;color:#F3F1EA;font-family:Arial,sans-serif;
+display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px">
+<div><div style="font-family:Impact,Arial Narrow,sans-serif;font-size:28px;letter-spacing:1px">LOOPSTITCH<span style="color:#FF3B5C">.</span></div>
+<p style="color:#A6A6AE;max-width:420px">{message}</p><a href="/" style="color:#E8FF52">Back to the store</a></div></body></html>""",
+        status_code=200 if ok else 400,
+    )
+
+
+@app.post("/api/unsubscribe")
+def unsubscribe_one_click(s: int = 0, t: str = "", db: Session = Depends(get_db)):
+    """RFC 8058 one-click unsubscribe (the button Gmail shows next to the sender)."""
+    if not _unsubscribe(s, t, db):
+        raise HTTPException(status_code=400, detail="Invalid unsubscribe link")
+    return {"detail": "Unsubscribed"}
+
+
+@app.get("/api/admin/launch-alerts")
+def admin_launch_alerts_status(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    subs = db.query(models.Subscriber).all()
+    active = [x for x in subs if not x.unsubscribed]
+    raw = _get_all_settings(db)
+    return {
+        "email_configured": mailer.is_configured(),
+        "whatsapp_configured": whatsapp_helper.is_configured(),
+        "total": len(active),
+        "email": sum(1 for x in active if x.kind == "email"),
+        "whatsapp": sum(1 for x in active if x.kind != "email"),
+        "welcomed": sum(1 for x in active if x.welcomed_at),
+        "sent": sum(1 for x in active if x.notified_at),
+        "failed": sum(1 for x in active if not x.notified_at and x.notify_error),
+        "unsubscribed": len(subs) - len(active),
+        "sent_at": raw.get("launch_alerts_sent_at", ""),
+        "launch_label": launch_alerts.launch_label(raw),
+    }
+
+
+@app.post("/api/admin/launch-alerts/test")
+def admin_launch_alerts_test(payload: schemas.LaunchAlertTest, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    try:
+        channel = launch_alerts.send_test(payload.contact, payload.kind, db)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Test failed: {exc}")
+    label = "sign-up confirmation" if payload.kind == "welcome" else "1-minute launch reminder"
+    return {"detail": f"Test {label} sent by {channel} to {payload.contact}"}
+
+
+@app.post("/api/admin/launch-alerts/send-now")
+def admin_launch_alerts_send_now(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Send the launch reminder now to everyone not yet notified (also retries failures)."""
+    counts = launch_alerts.send_pending(db)
+    set_setting(db, "launch_alerts_sent_at", launch_alerts._utcnow().isoformat(timespec="seconds"))
+    db.commit()
+    return counts
 
 
 @app.get("/api/admin/subscribers")
 def admin_list_subscribers(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     rows = db.query(models.Subscriber).order_by(models.Subscriber.created_at.desc()).all()
-    return [{"id": r.id, "contact": r.contact, "kind": r.kind, "source": r.source, "created_at": r.created_at} for r in rows]
+    return [{"id": r.id, "contact": r.contact, "kind": r.kind, "source": r.source, "created_at": r.created_at,
+             "welcomed_at": r.welcomed_at, "notified_at": r.notified_at, "notify_error": r.notify_error or "",
+             "unsubscribed": bool(r.unsubscribed)} for r in rows]
 
 
 # ============================================================

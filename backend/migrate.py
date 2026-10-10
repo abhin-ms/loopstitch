@@ -76,6 +76,12 @@ def ensure_columns() -> None:
             models.OrderItem.print_area,
             models.OrderItem.design_notes,
         ],
+        "subscribers": [
+            models.Subscriber.welcomed_at,
+            models.Subscriber.notified_at,
+            models.Subscriber.notify_error,
+            models.Subscriber.unsubscribed,
+        ],
         "products": [
             models.Product.meta_title,
             models.Product.meta_description,
@@ -202,6 +208,7 @@ def seed_settings() -> None:
         "cod_enabled": "false",
         "whatsapp_enabled": "true",
         "launch_mode": "false",
+        "launch_alerts_enabled": "false",
         "ship_auto_pickup": "true",
         "ship_pickup_location": "",
         "ship_days_standard": "3",

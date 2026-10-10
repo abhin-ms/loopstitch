@@ -357,6 +357,11 @@ class Subscriber(Base):
     contact = Column(String(150), unique=True, index=True, nullable=False)  # email or phone
     kind = Column(String(20), default="email")  # email / phone
     source = Column(String(50), default="home")
+    welcomed_at = Column(DateTime, nullable=True)  # "you're on the list" sent right after sign-up
+    # launch alert ("live in 1 minute") — sent once, a minute before launch
+    notified_at = Column(DateTime, nullable=True)
+    notify_error = Column(Text, nullable=True)
+    unsubscribed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
 
 

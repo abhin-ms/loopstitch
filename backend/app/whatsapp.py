@@ -18,6 +18,8 @@ API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v23.0")
 # Template names/language exactly as approved in WhatsApp Manager (change in the server env, no code change needed)
 OTP_TEMPLATE = os.getenv("WHATSAPP_OTP_TEMPLATE", "otp_verification")
 ORDER_TEMPLATE = os.getenv("WHATSAPP_ORDER_TEMPLATE", "order_confirm")
+LAUNCH_TEMPLATE = os.getenv("WHATSAPP_LAUNCH_TEMPLATE", "store_launch")
+WELCOME_TEMPLATE = os.getenv("WHATSAPP_WELCOME_TEMPLATE", "subscribe_confirm")
 # order_shipped has a static "Track order" link button, so only body variables are sent
 SHIPPED_TEMPLATE = os.getenv("WHATSAPP_SHIPPED_TEMPLATE", "order_shipped")
 TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "en")
@@ -193,3 +195,24 @@ def send_shipped_message(phone: str, customer_name: str, order_number: str, cour
         language_code=TEMPLATE_LANG,
         body_params=build_shipped_params(customer_name, order_number, courier, awb),
     )
+
+
+def send_launch_message(phone: str, template: str = "") -> Dict[str, Any]:
+    """Subscriber message (sign-up confirmation or 1-minute launch reminder). The templates
+    have no variables — subscribers leave only a number — and static link buttons."""
+    if not is_configured():
+        raise RuntimeError("WhatsApp is not configured — missing PHONE_NUMBER_ID or ACCESS_TOKEN")
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "".join(c for c in phone if c.isdigit()),
+        "type": "template",
+        "template": {"name": template or LAUNCH_TEMPLATE, "language": {"policy": "deterministic", "code": TEMPLATE_LANG}},
+    }
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.post(f"{BASE_URL}/{PHONE_NUMBER_ID}/messages", json=payload, headers=_headers())
+        data = resp.json()
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
+    messages = data.get("messages", [])
+    return {"message_id": messages[0].get("id", "") if messages else ""}

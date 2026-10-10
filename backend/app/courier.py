@@ -23,7 +23,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from . import delhivery, models, order_lifecycle
+from . import delhivery, launch_alerts, models, order_lifecycle
 from . import whatsapp as whatsapp_helper
 from .database import SessionLocal
 from .offers import set_setting
@@ -261,6 +261,13 @@ def tick() -> None:
             db.rollback()
             logger.exception("Expiring unpaid orders failed")
 
+        # "we're live" email / WhatsApp to subscribers, once, when the store opens
+        try:
+            launch_alerts.maybe_send_launch_alerts(db)
+        except Exception:
+            db.rollback()
+            logger.exception("Launch alerts failed")
+
         if not delhivery.is_configured():
             return
         cfg = load_config(db)
@@ -300,7 +307,21 @@ def main() -> None:
             tick()
         except Exception:
             logger.exception("Courier worker tick crashed")
-        time.sleep(TICK_SECONDS)
+        time.sleep(_next_sleep())
+
+
+def _next_sleep() -> float:
+    """Normally TICK_SECONDS, but wake right at launch time so alerts go out on the minute."""
+    db = SessionLocal()
+    try:
+        due_in = launch_alerts.seconds_until_due(db)
+    except Exception:
+        due_in = None
+    finally:
+        db.close()
+    if due_in is not None and 0 < due_in < TICK_SECONDS:
+        return due_in + 2
+    return TICK_SECONDS
 
 
 if __name__ == "__main__":

@@ -346,6 +346,7 @@ class SettingsOut(BaseModel):
     launch_date: str = ""         # ISO datetime for the countdown, "" = no countdown
     launch_message: str = ""
     launch_auto_open: bool = False  # open the store by itself when the countdown ends
+    launch_alerts_enabled: bool = False  # message subscribers when the store opens
     ship_configured: bool = False   # DELHIVERY_API_TOKEN present on the server
     ship_auto_pickup: bool = True
     ship_pickup_location: str = ""
@@ -365,6 +366,7 @@ class SettingsUpdate(BaseModel):
     launch_date: Optional[str] = Field(default=None, max_length=40)
     launch_message: Optional[str] = Field(default=None, max_length=200)
     launch_auto_open: Optional[bool] = None
+    launch_alerts_enabled: Optional[bool] = None
     ship_auto_pickup: Optional[bool] = None
     ship_pickup_location: Optional[str] = Field(default=None, max_length=150)
     ship_days_standard: Optional[int] = Field(default=None, ge=1, le=30)
@@ -626,6 +628,11 @@ class CustomQuoteOut(BaseModel):
 
 
 # ---------- Subscribers & Reviews ----------
+class LaunchAlertTest(BaseModel):
+    contact: str = Field(min_length=5, max_length=150)
+    kind: Literal["welcome", "reminder"] = "reminder"
+
+
 class SubscribeIn(BaseModel):
     contact: str = Field(min_length=5, max_length=150)
     source: str = Field(default="home", max_length=50)
