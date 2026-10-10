@@ -51,6 +51,10 @@ def build(to: str, subject: str, html: str, text: str, headers: Optional[Dict[st
         msg[key] = value
     msg.set_content(text)  # plain-text part for clients that block HTML
     msg.add_alternative(html, subtype="html")
+    # add_alternative leaves a second MIME-Version inside the HTML part; spam filters
+    # (amavis BAD-HEADER-7) penalise the duplicate, so keep it only on the top level
+    for part in msg.iter_parts():
+        del part["MIME-Version"]
     return msg
 
 
