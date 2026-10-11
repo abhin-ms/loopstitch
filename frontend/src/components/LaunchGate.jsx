@@ -5,6 +5,18 @@ import Loader from './Loader'
 import { useAdminAuth } from '../context/AdminAuthContext'
 
 const LaunchingSoon = lazy(() => import('../pages/LaunchingSoon'))
+const VISIT_KEY = 'loopstitch_visit_counted'
+
+// Anonymous visit counter for Admin → Dashboard: one "visit" per browsing session,
+// one "page view" per page. Admins browsing their own store are not counted.
+function trackPageView() {
+  let newVisit = false
+  try {
+    newVisit = !sessionStorage.getItem(VISIT_KEY)
+    sessionStorage.setItem(VISIT_KEY, '1')
+  } catch { /* storage blocked: still count the page view */ }
+  client.post('/api/track', { new_visit: newVisit }).catch(() => {})
+}
 
 // Wraps the storefront + mobile app. While "launch mode" is on in admin
 // settings, visitors only ever see the launching soon page. A logged-in
@@ -13,7 +25,13 @@ export default function LaunchGate() {
   const { isAuthenticated, loading: adminLoading } = useAdminAuth()
   const [launch, setLaunch] = useState(null)
   // ?preview-launch lets the admin see the page without switching it on
-  const preview = new URLSearchParams(useLocation().search).has('preview-launch')
+  const { pathname, search } = useLocation()
+  const preview = new URLSearchParams(search).has('preview-launch')
+
+  useEffect(() => {
+    if (adminLoading || isAuthenticated) return
+    trackPageView()
+  }, [pathname, adminLoading, isAuthenticated])
 
   useEffect(() => {
     client

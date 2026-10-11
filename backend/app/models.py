@@ -365,6 +365,16 @@ class Subscriber(Base):
     created_at = Column(DateTime, default=_utcnow)
 
 
+class SiteVisit(Base):
+    """Anonymous daily totals for the storefront (no IPs, no cookies, nothing personal)."""
+    __tablename__ = "site_visits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    day = Column(Date, unique=True, index=True, nullable=False)  # India date
+    visits = Column(Integer, default=0, nullable=False)       # browsing sessions
+    page_views = Column(Integer, default=0, nullable=False)   # every page opened
+
+
 class Review(Base):
     """Customer product review. Hidden from the storefront until an admin approves it."""
     __tablename__ = "reviews"

@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from . import models, schemas, auth
 from .database import engine, get_db, SessionLocal
@@ -1673,6 +1674,38 @@ def admin_delete_coupon(coupon_id: int, db: Session = Depends(get_db), current: 
 # ============================================================
 # ADMIN DASHBOARD STATS
 # ============================================================
+_BOT_UA = re.compile(r"bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|headless|lighthouse|monitor|curl|python|wget", re.I)
+_IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+
+def _today_ist() -> datetime.date:
+    return datetime.datetime.now(_IST).date()
+
+
+@app.post("/api/track", status_code=204)
+def track_visit(payload: schemas.TrackIn, request: Request, db: Session = Depends(get_db)):
+    """Storefront page-view ping: bumps today's anonymous totals. Bots are ignored."""
+    if _BOT_UA.search(request.headers.get("user-agent", "")):
+        return Response(status_code=204)
+    ratelimit.limit(request, "track", max_hits=600, window_seconds=60 * 60)
+    today = _today_ist()
+    bump = {models.SiteVisit.page_views: models.SiteVisit.page_views + 1}
+    if payload.new_visit:
+        bump[models.SiteVisit.visits] = models.SiteVisit.visits + 1
+    # atomic +1; the first ping of the day creates the row (retry if another worker beat us to it)
+    for _ in range(2):
+        if db.query(models.SiteVisit).filter(models.SiteVisit.day == today).update(bump, synchronize_session=False):
+            db.commit()
+            break
+        try:
+            db.add(models.SiteVisit(day=today, visits=1 if payload.new_visit else 0, page_views=1))
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()
+    return Response(status_code=204)
+
+
 @app.get("/api/admin/stats")
 def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     total_products = db.query(models.Product).count()
@@ -1683,7 +1716,16 @@ def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(a
     ).scalar()
     low_stock = db.query(models.ProductSize).filter(models.ProductSize.stock <= 3, models.ProductSize.stock > 0).count()
     out_of_stock = db.query(models.ProductSize).filter(models.ProductSize.stock == 0).count()
+    today = _today_ist()
+    visit_rows = db.query(models.SiteVisit).all()
+    def visit_sum(field, since=None):
+        return sum(getattr(r, field) or 0 for r in visit_rows if since is None or r.day >= since)
     return {
+        "visitors_today": visit_sum("visits", today),
+        "visitors_7d": visit_sum("visits", today - datetime.timedelta(days=6)),
+        "visitors_total": visit_sum("visits"),
+        "page_views_today": visit_sum("page_views", today),
+        "page_views_total": visit_sum("page_views"),
         "total_products": total_products,
         "total_orders": total_orders,
         "revenue": float(revenue_sum),

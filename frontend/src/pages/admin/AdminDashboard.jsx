@@ -25,9 +25,30 @@ export default function AdminDashboard() {
     { label: 'Sold-out sizes', value: stats.out_of_stock_sizes, danger: stats.out_of_stock_sizes > 0 },
   ]
 
+  // anonymous visit counter (no personal data) — see /api/track
+  const visits = [
+    { label: 'Visitors today', value: stats.visitors_today, accent: true },
+    { label: 'Visitors · 7 days', value: stats.visitors_7d },
+    { label: 'Visitors · all time', value: stats.visitors_total },
+    { label: 'Page views today', value: stats.page_views_today },
+    { label: 'Page views · all time', value: stats.page_views_total },
+  ]
+
   return (
     <div>
       <h1 className="font-display text-2xl sm:text-3xl uppercase text-paper mb-8">Dashboard</h1>
+      <p className="font-mono text-[11px] uppercase tracking-widest text-slate mb-3">Website visits</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        {visits.map((c) => (
+          <div key={c.label} className="border border-panel-2 p-3 sm:p-5 min-w-0 overflow-hidden">
+            <p className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em] sm:tracking-widest text-slate mb-2 break-words">{c.label}</p>
+            <p className={`font-display text-lg sm:text-2xl truncate ${c.accent ? 'text-acid' : 'text-paper'}`}>
+              {(c.value ?? 0).toLocaleString('en-IN')}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="font-mono text-[11px] uppercase tracking-widest text-slate mb-3">Store</p>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
         {cards.map((c) => (
           <div key={c.label} className="border border-panel-2 p-3 sm:p-5 min-w-0 overflow-hidden">

@@ -628,6 +628,10 @@ class CustomQuoteOut(BaseModel):
 
 
 # ---------- Subscribers & Reviews ----------
+class TrackIn(BaseModel):
+    new_visit: bool = False  # first page of a browsing session
+
+
 class LaunchAlertTest(BaseModel):
     contact: str = Field(min_length=5, max_length=150)
     kind: Literal["welcome", "reminder"] = "reminder"
