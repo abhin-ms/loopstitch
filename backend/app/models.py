@@ -31,6 +31,7 @@ class Product(Base):
     price = Column(Float, nullable=False)
     compare_at_price = Column(Float, nullable=True)  # for "was ₹X" strike-through
     category = Column(String(100), default="tshirt", index=True)  # tshirt / hoodie / etc
+    likes = Column(Integer, default=0, server_default="0", nullable=False)  # ❤ like count shown on the product (admin can edit)
     colorway = Column(String(100), default="")
     meta_title = Column(String(255), nullable=True)
     meta_description = Column(Text, nullable=True)

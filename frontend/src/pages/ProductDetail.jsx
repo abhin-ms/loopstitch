@@ -12,6 +12,7 @@ import StarRating from '../components/StarRating'
 import ProductDetails from '../components/ProductDetails'
 import RecentlyViewed from '../components/RecentlyViewed'
 import AddedToCart from '../components/AddedToCart'
+import LikeButton from '../components/LikeButton'
 import { pushRecent } from '../utils/recentlyViewed'
 import { removeServerLd } from '../utils/serverLd'
 import { useWishlist } from '../context/WishlistContext'
@@ -270,7 +271,8 @@ export default function ProductDetail() {
             {!selectedSize ? 'Select a size' : maxForSize < 1 ? 'Sold out' : justAdded ? 'Added ✓' : 'Add to cart'}
           </button>
 
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-wrap gap-3 mt-4">
+            <LikeButton key={product.id} product={product} />
             <button type="button" onClick={() => wishlist.toggle(product.id)} aria-pressed={wishlist.has(product.id)} className="border border-panel-2 px-4 py-3 font-mono text-xs uppercase tracking-widest text-slate hover:text-riot hover:border-riot transition-colors">
               {wishlist.has(product.id) ? '♥ Saved' : '♡ Save'}
             </button>

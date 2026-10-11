@@ -7,7 +7,7 @@ const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL']
 const makeSizes = () => DEFAULT_SIZES.map((size) => ({ size, stock: 0 }))
 const makeColor = (name = 'Black') => ({ name, hex_code: '#000000', sizes: makeSizes(), images: [] })
 const emptyForm = {
-  name: '', description: '', price: '', compare_at_price: '', category: 'tshirt',
+  name: '', description: '', price: '', compare_at_price: '', likes: 0, category: 'tshirt',
   colorway: '', meta_title: '', meta_description: '', is_active: true, is_featured: false,
 }
 
@@ -28,7 +28,7 @@ export default function AdminProductForm() {
     client.get(`/api/admin/products/${id}`).then(({ data: p }) => {
       setForm({
         name: p.name, description: p.description || '', price: p.price,
-        compare_at_price: p.compare_at_price ?? '', category: p.category,
+        compare_at_price: p.compare_at_price ?? '', likes: p.likes ?? 0, category: p.category,
         colorway: p.colorway || '', meta_title: p.meta_title || '',
         meta_description: p.meta_description || '', is_active: p.is_active, is_featured: p.is_featured,
       })
@@ -69,6 +69,7 @@ export default function AdminProductForm() {
         ...form,
         price: Number(form.price),
         compare_at_price: form.compare_at_price === '' ? null : Number(form.compare_at_price),
+        likes: Math.max(0, Math.floor(Number(form.likes) || 0)),
         colors: colors.map((color, position) => ({
           ...(color.id ? { id: color.id } : {}), name: color.name.trim(), hex_code: color.hex_code,
           position, sizes: color.sizes.filter((size) => size.size.trim()).map((size) => ({ ...size, size: size.size.trim().toUpperCase() })),
@@ -114,6 +115,24 @@ export default function AdminProductForm() {
     } catch { alert('Failed to delete image.') }
   }
 
+  // Gallery order: the first image is the main photo on the shop + product page
+  const moveImage = async (colorId, from, to) => {
+    const color = colors.find((c) => c.id === colorId)
+    const images = [...(color?.images || [])]
+    if (!color || to < 0 || to >= images.length || from === to) return
+    const [moved] = images.splice(from, 1)
+    images.splice(to, 0, moved)
+    setColors((prev) => prev.map((c) => (c.id === colorId ? { ...c, images } : c)))  // show it right away
+    try {
+      const res = await client.put(`/api/admin/products/${productId}/images/order`, { ids: images.map((img) => img.id) })
+      setColors(res.data.colors || colors)
+    } catch {
+      setError('Could not save the new image order.')
+      const refreshed = await client.get(`/api/admin/products/${productId}`)
+      setColors(refreshed.data.colors || colors)
+    }
+  }
+
   if (loading) return <Loader label="Loading product" />
 
   return (
@@ -127,6 +146,7 @@ export default function AdminProductForm() {
           <div className="grid sm:grid-cols-3 gap-5">
             <Field label="Price (₹)" name="price" type="number" min="0" step="1" value={form.price} onChange={handleChange} required />
             <Field label="Compare-at price (₹)" name="compare_at_price" type="number" min="0" step="1" value={form.compare_at_price} onChange={handleChange} />
+            <Field label="❤ Likes (shown to customers — edit if needed)" name="likes" type="number" min="0" step="1" value={form.likes} onChange={handleChange} />
             <label className="block"><span className="field-label">Category</span><select name="category" value={form.category} onChange={handleChange} className="field-input"><option value="tshirt">T-Shirt</option><option value="hoodie">Hoodie</option><option value="accessory">Accessory</option></select></label>
           </div>
           <Field label="Legacy colorway label (optional)" name="colorway" value={form.colorway} onChange={handleChange} placeholder="Used only as a fallback label" />
@@ -139,7 +159,22 @@ export default function AdminProductForm() {
             <div key={color.id || colorIndex} className="border border-panel-2 p-4 space-y-5">
               <div className="flex flex-wrap items-end gap-3"><label className="flex-1 min-w-40"><span className="field-label">Color name</span><input value={color.name} onChange={(e) => updateColor(colorIndex, 'name', e.target.value)} className="field-input" placeholder="Black" required /></label><label><span className="field-label">Swatch</span><input type="color" value={color.hex_code || '#000000'} onChange={(e) => updateColor(colorIndex, 'hex_code', e.target.value)} className="h-11 w-16 bg-panel border border-panel-2 p-1" /></label>{colors.length > 1 && <button type="button" onClick={() => removeColor(colorIndex)} className="text-riot font-mono text-[11px] uppercase tracking-widest px-2 py-2">Remove</button>}</div>
               <div><div className="flex items-center justify-between mb-3"><span className="field-label">Sizes &amp; stock</span><button type="button" onClick={() => addSize(colorIndex)} className="text-slate hover:text-paper font-mono text-[11px] uppercase tracking-widest px-3 py-3 -mr-3">+ Add size</button></div><div className="space-y-2">{color.sizes.map((size, sizeIndex) => <div key={sizeIndex} className="flex flex-wrap items-center gap-2"><input value={size.size} onChange={(e) => updateSize(colorIndex, sizeIndex, 'size', e.target.value.toUpperCase())} className="field-input w-24" placeholder="SIZE" /><input type="number" min="0" value={size.stock} onChange={(e) => updateSize(colorIndex, sizeIndex, 'stock', e.target.value)} className="field-input w-28" placeholder="Stock" /><span className="font-mono text-[11px] text-slate">{size.stock === 0 ? 'locked' : `${size.stock} units`}</span><button type="button" onClick={() => removeSize(colorIndex, sizeIndex)} className="text-riot font-mono text-[11px] px-2 py-2">Remove</button></div>)}</div></div>
-              <div><span className="field-label block mb-3">Images for {color.name || 'this color'}</span>{!productId || !color.id ? <p className="font-mono text-xs text-slate">Save the product first, then upload color images.</p> : <><div className="flex flex-wrap gap-3 mb-4">{(color.images || []).map((image) => <div key={image.id} className="relative w-24 h-28 group"><img src={mediaUrl(image.url)} alt={`${color.name} product`} className="w-full h-full object-cover" /><button type="button" onClick={() => handleImageDelete(color.id, image.id)} className="absolute top-1 right-1 bg-ink/80 text-riot w-11 h-11 opacity-100 lg:opacity-0 lg:group-hover:opacity-100" aria-label="Delete image">✕</button></div>)}</div><input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(color.id, e)} className="font-mono text-xs text-slate w-full py-2 file:mr-3 file:border file:border-panel-2 file:bg-panel file:px-4 file:py-2.5 file:font-mono file:text-xs file:uppercase file:tracking-widest file:text-paper" />{uploading === color.id && <p className="font-mono text-xs text-acid mt-2">Uploading…</p>}</>}</div>
+              <div><span className="field-label block mb-1">Images for {color.name || 'this color'}</span><p className="font-mono text-[11px] text-slate mb-3">The first image (MAIN) shows on the shop. Use ◀ ▶ to reorder, ★ to make an image the main one.</p>{!productId || !color.id ? <p className="font-mono text-xs text-slate">Save the product first, then upload color images.</p> : <><div className="flex flex-wrap gap-3 mb-4">{(color.images || []).map((image, i, all) => (
+                <div key={image.id} className="w-24">
+                  <div className={`relative h-28 group border ${i === 0 ? 'border-acid' : 'border-transparent'}`}>
+                    <img src={mediaUrl(image.url)} alt={`${color.name} product`} className="w-full h-full object-cover" />
+                    {i === 0 && <span className="absolute bottom-0 inset-x-0 bg-acid text-ink text-center font-mono text-[9px] font-bold uppercase tracking-widest py-0.5">Main</span>}
+                    <button type="button" onClick={() => handleImageDelete(color.id, image.id)} className="absolute top-1 right-1 bg-ink/80 text-riot w-11 h-11 opacity-100 lg:opacity-0 lg:group-hover:opacity-100" aria-label="Delete image">✕</button>
+                  </div>
+                  {all.length > 1 && (
+                    <div className="grid grid-cols-3 mt-1 border border-panel-2 font-mono text-xs text-paper">
+                      <button type="button" onClick={() => moveImage(color.id, i, i - 1)} disabled={i === 0} className="py-1.5 hover:text-acid disabled:opacity-25" aria-label="Move image earlier" title="Move earlier">◀</button>
+                      <button type="button" onClick={() => moveImage(color.id, i, 0)} disabled={i === 0} className="py-1.5 border-x border-panel-2 hover:text-acid disabled:opacity-25" aria-label="Make this the main image" title="Make main image">★</button>
+                      <button type="button" onClick={() => moveImage(color.id, i, i + 1)} disabled={i === all.length - 1} className="py-1.5 hover:text-acid disabled:opacity-25" aria-label="Move image later" title="Move later">▶</button>
+                    </div>
+                  )}
+                </div>
+              ))}</div><input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(color.id, e)} className="font-mono text-xs text-slate w-full py-2 file:mr-3 file:border file:border-panel-2 file:bg-panel file:px-4 file:py-2.5 file:font-mono file:text-xs file:uppercase file:tracking-widest file:text-paper" />{uploading === color.id && <p className="font-mono text-xs text-acid mt-2">Uploading…</p>}</>}</div>
             </div>
           ))}
         </div>

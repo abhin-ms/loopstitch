@@ -83,6 +83,7 @@ def ensure_columns() -> None:
             models.Subscriber.unsubscribed,
         ],
         "products": [
+            models.Product.likes,
             models.Product.meta_title,
             models.Product.meta_description,
         ],

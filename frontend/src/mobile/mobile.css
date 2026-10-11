@@ -333,3 +333,18 @@
 }
 
 .ls-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ❤ like button next to the price */
+.ls-like {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ls-like[aria-pressed='true'] {
+  border-color: var(--ls-accent);
+  color: var(--ls-accent);
+}

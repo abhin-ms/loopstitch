@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 
 from . import models, schemas, auth
@@ -541,15 +541,38 @@ async def upload_product_images(
 
         url = store_upload(contents, fname, file.content_type, "products")
 
-        position = db.query(models.ProductImage).filter(
+        # after the current last image (count() would collide once an image has been deleted)
+        last = db.query(func.max(models.ProductImage.position)).filter(
             models.ProductImage.product_id == product_id,
             models.ProductImage.color_id == color_id,
-        ).count()
+        ).scalar()
+        position = 0 if last is None else last + 1
         db.add(models.ProductImage(
             product_id=product_id, color_id=color_id,
             url=url, position=position
         ))
 
+    db.commit()
+    db.refresh(product)
+    return product
+
+
+@app.put("/api/admin/products/{product_id}/images/order", response_model=schemas.ProductOut)
+def reorder_product_images(product_id: int, payload: schemas.IdList, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Gallery order chosen in admin: ids[0] becomes the main (first) image."""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    images = {
+        img.id: img
+        for img in db.query(models.ProductImage).filter(
+            models.ProductImage.product_id == product_id, models.ProductImage.id.in_(payload.ids)
+        )
+    }
+    if len(images) != len(set(payload.ids)):
+        raise HTTPException(status_code=400, detail="Some images don't belong to this product")
+    for position, image_id in enumerate(payload.ids):
+        images[image_id].position = position
     db.commit()
     db.refresh(product)
     return product
@@ -1680,6 +1703,22 @@ _IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 def _today_ist() -> datetime.date:
     return datetime.datetime.now(_IST).date()
+
+
+@app.post("/api/products/{slug}/like")
+def like_product(slug: str, payload: schemas.LikeIn, request: Request, db: Session = Depends(get_db)):
+    """Visitor ❤ like (no login). The browser remembers it liked the product; this caps abuse per IP."""
+    ratelimit.limit(request, "like", max_hits=60, window_seconds=60 * 60)
+    product = db.query(models.Product).filter(models.Product.slug == slug, models.Product.is_active == True).first()  # noqa: E712
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    # atomic +1 / -1 so simultaneous likes don't overwrite each other; never below 0
+    likes = models.Product.likes
+    change = likes + 1 if payload.liked else case((likes > 0, likes - 1), else_=0)
+    db.query(models.Product).filter(models.Product.id == product.id).update({models.Product.likes: change}, synchronize_session=False)
+    db.commit()
+    db.refresh(product)
+    return {"likes": product.likes}
 
 
 @app.post("/api/track", status_code=204)

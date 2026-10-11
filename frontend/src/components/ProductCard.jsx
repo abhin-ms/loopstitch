@@ -4,6 +4,7 @@ import { mediaUrl } from '../api/client'
 import { formatINR } from '../utils/format'
 import { useWishlist } from '../context/WishlistContext'
 import { haptic } from '../utils/haptics'
+import { HeartIcon } from './LikeButton'
 
 export default function ProductCard({ product, index = 0 }) {
   const wishlist = useWishlist()
@@ -88,6 +89,11 @@ export default function ProductCard({ product, index = 0 }) {
             <span className="text-paper text-sm">{formatINR(product.price)}</span>
             {product.compare_at_price && (
               <span className="block text-slate-dim text-[11px] line-through">{formatINR(product.compare_at_price)}</span>
+            )}
+            {product.likes > 0 && (
+              <span className="flex items-center justify-end gap-1 text-slate text-[11px] mt-0.5" aria-label={`${product.likes} likes`}>
+                <HeartIcon size={12} filled /> {product.likes.toLocaleString('en-IN')}
+              </span>
             )}
           </div>
         </div>

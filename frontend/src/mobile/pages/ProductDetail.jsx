@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext'
 import { formatINR } from '../../utils/format'
 import { useToast } from '../context/ToastContext'
 import StitchLoader from '../components/StitchLoader'
+import LikeButton from '../../components/LikeButton'
 
 export default function MobileProductDetail() {
   const { slug } = useParams()
@@ -88,7 +89,10 @@ export default function MobileProductDetail() {
         )}
 
         <h1 style={{ margin: '0 0 4px', fontSize: 21, fontWeight: 800, lineHeight: 1.2 }}>{product.name}</h1>
-        <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800, color: 'var(--ls-accent)' }}>{formatINR(product.price)}</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 0 16px' }}>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ls-accent)' }}>{formatINR(product.price)}</p>
+          <LikeButton key={product.id} product={product} className="ls-btn-outline ls-like" />
+        </div>
 
         <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ls-text-muted)' }}>
           Size

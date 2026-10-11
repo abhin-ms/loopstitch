@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 from datetime import date, datetime
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from . import models
 
@@ -24,6 +24,27 @@ class ProductImageOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+_SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"]
+_SIZE_ALIASES = {"2XL": "XXL", "3XL": "XXXL"}
+
+
+def size_sort_key(size: str):
+    """S, M, L, XL order instead of whatever order the sizes were added in.
+    Known letter sizes first, then numeric sizes (28, 30...), then anything else."""
+    s = (size or "").strip().upper()
+    s = _SIZE_ALIASES.get(s, s)
+    if s in _SIZE_ORDER:
+        return (0, _SIZE_ORDER.index(s), "")
+    try:
+        return (1, float(s), "")
+    except ValueError:
+        return (2, 0, s)
+
+
+def _sorted_sizes(sizes):
+    return sorted(sizes or [], key=lambda x: size_sort_key(x.size))
 
 
 class ProductSizeIn(BaseModel):
@@ -53,6 +74,11 @@ class ProductColorOut(BaseModel):
     position: int
     images: List[ProductImageOut] = []
     sizes: List[ProductSizeOut] = []
+
+    @field_validator("sizes")
+    @classmethod
+    def _order_sizes(cls, v):
+        return _sorted_sizes(v)
 
     class Config:
         from_attributes = True
@@ -88,6 +114,7 @@ class ProductUpdate(BaseModel):
     is_featured: Optional[bool] = None
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
+    likes: Optional[int] = Field(default=None, ge=0, le=10_000_000)  # admin can set the ❤ like count
     sizes: Optional[List[ProductSizeIn]] = None
     colors: Optional[List[ProductColorIn]] = None
 
@@ -95,11 +122,17 @@ class ProductUpdate(BaseModel):
 class ProductOut(ProductBase):
     id: int
     slug: str
+    likes: int = 0
     created_at: datetime
     images: List[ProductImageOut] = []
     sizes: List[ProductSizeOut] = []
     colors: List[ProductColorOut] = []
     total_stock: int
+
+    @field_validator("sizes")
+    @classmethod
+    def _order_sizes(cls, v):
+        return _sorted_sizes(v)
 
     class Config:
         from_attributes = True
@@ -628,6 +661,10 @@ class CustomQuoteOut(BaseModel):
 
 
 # ---------- Subscribers & Reviews ----------
+class LikeIn(BaseModel):
+    liked: bool = True  # False = take the like back
+
+
 class TrackIn(BaseModel):
     new_visit: bool = False  # first page of a browsing session
 
