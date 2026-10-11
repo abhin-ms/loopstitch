@@ -17,6 +17,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from . import models
+from . import owner_alerts
 from . import razorpay as razorpay_helper
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,7 @@ def expire_unpaid_orders(db: Session, timeout_minutes: int = PAYMENT_TIMEOUT_MIN
         .all()
     )
     expired = 0
+    confirmed = []
     for order in stale:
         if amount_due(order) <= 0:
             continue  # COD with no advance: nothing to pay online, admin handles it
@@ -173,6 +175,7 @@ def expire_unpaid_orders(db: Session, timeout_minutes: int = PAYMENT_TIMEOUT_MIN
             try:
                 if mark_paid(db, order, order.razorpay_order_id, captured, "reconciled") == "paid":
                     logger.info("Order %s was paid (found on Razorpay) — confirmed", order.order_number)
+                    confirmed.append(order)
                 continue
             except PaymentMismatch:
                 logger.warning("Razorpay payment %s for %s already used elsewhere", captured, order.order_number)
@@ -180,6 +183,8 @@ def expire_unpaid_orders(db: Session, timeout_minutes: int = PAYMENT_TIMEOUT_MIN
         expired += 1
         logger.info("Order %s unpaid after %s min — stock released", order.order_number, timeout_minutes)
     db.commit()
+    for order in confirmed:
+        owner_alerts.notify_new_order(db, order)  # never raises
     return expired
 
 
