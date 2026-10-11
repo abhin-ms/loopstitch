@@ -13,6 +13,12 @@ const STATUS_LABELS = {
 
 const STATUS_FILTERS = ['', 'sent', 'delivered', 'read', 'failed', 'pending']
 
+const TYPE_LABELS = {
+  order_confirm: 'Order confirmation',
+  order_shipped: 'Shipped',
+  admin_new_order: 'Owner alert',
+}
+
 export default function AdminNotifications() {
   const [notifications, setNotifications] = useState(null)
   const [total, setTotal] = useState(0)
@@ -145,9 +151,10 @@ export default function AdminNotifications() {
                     <p className="font-mono text-sm text-paper">
                       #{n.order_number}
                       <span className={`ml-2 text-[11px] ${statusInfo.color}`}>{statusInfo.label}</span>
+                      <span className="ml-2 text-[11px] text-slate">{TYPE_LABELS[n.message_type] || n.message_type}</span>
                     </p>
                     <p className="font-mono text-[11px] text-slate mt-0.5 truncate">
-                      {n.customer_name} · {n.customer_phone} · {formatDate(n.created_at)}
+                      {n.customer_name} · {n.message_type === 'admin_new_order' ? `to ${n.customer_phone}` : n.customer_phone} · {formatDate(n.created_at)}
                     </p>
                     {n.error_message && (
                       <p className="font-mono text-[11px] text-riot mt-1 max-w-lg truncate" title={n.error_message}>

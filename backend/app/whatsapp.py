@@ -3,6 +3,7 @@ WhatsApp Business Cloud API helpers (Meta Cloud API v23.0).
 
 Sends pre-approved template messages for order confirmations.
 """
+import datetime
 import os
 import logging
 from typing import Dict, Any, List, Optional
@@ -23,6 +24,13 @@ WELCOME_TEMPLATE = os.getenv("WHATSAPP_WELCOME_TEMPLATE", "subscribe_confirm")
 # order_shipped has a static "Track order" link button, so only body variables are sent
 SHIPPED_TEMPLATE = os.getenv("WHATSAPP_SHIPPED_TEMPLATE", "order_shipped")
 TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "en")
+
+# Owner alert for every confirmed order (see owner_alerts.py). Fixed here on purpose:
+# change the template name or the numbers in this file.
+ADMIN_ORDER_TEMPLATE = "admin_new_order"
+ADMIN_ALERT_NUMBERS = ["916238860673", "919544875330"]
+
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30), "IST")
 
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
@@ -216,3 +224,62 @@ def send_launch_message(phone: str, template: str = "") -> Dict[str, Any]:
         raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
     messages = data.get("messages", [])
     return {"message_id": messages[0].get("id", "") if messages else ""}
+
+
+# ---------------------------------------------------------------- owner alert
+def payment_label(order) -> str:
+    """How the order is paid, e.g. "Online (Razorpay)", "COD — 10% paid online" or "Cash on delivery"."""
+    if order.payment_method == "cod":
+        pct = 10 if order.cod_advance_percent is None else order.cod_advance_percent
+        if pct <= 0:
+            return "Cash on delivery"
+        return f"COD — {pct:.0f}% paid online"
+    return "Online (Razorpay)"
+
+
+def format_ist(moment: Optional[datetime.datetime]) -> str:
+    """A naive-UTC (or timezone-aware) time as India time, e.g. "11 Oct 2026, 6:16 PM"."""
+    if moment is None:
+        moment = datetime.datetime.now(datetime.timezone.utc)
+    elif moment.tzinfo is None:
+        moment = moment.replace(tzinfo=datetime.timezone.utc)
+    local = moment.astimezone(IST)
+    hour = local.strftime("%I").lstrip("0")
+    return f"{local.day} {local.strftime('%b %Y')}, {hour}:{local.strftime('%M %p')}"
+
+
+def _template_text(value: Any) -> str:
+    """WhatsApp rejects template variables with newlines, tabs or long runs of spaces."""
+    return " ".join(str(value or "").split())[:1000]
+
+
+def build_admin_order_params(
+    customer_name: str,
+    item_count: int,
+    total: float,
+    payment: str,
+    ordered_at: Optional[datetime.datetime],
+) -> List[str]:
+    """
+    admin_new_order template variables:
+      {{1}} = customer name           {{2}} = number of items in the order
+      {{3}} = order amount ("₹1,798") {{4}} = payment method
+      {{5}} = order time in India ("11 Oct 2026, 6:16 PM")
+    """
+    return [
+        _template_text(customer_name) or "Customer",
+        str(int(item_count or 0)),
+        f"₹{float(total or 0):,.0f}",
+        _template_text(payment),
+        format_ist(ordered_at),
+    ]
+
+
+def send_admin_order_alert(phone: str, body_params: List[str]) -> Dict[str, Any]:
+    """Send the owner alert template to one owner number."""
+    return send_template_message(
+        phone=phone,
+        template_name=ADMIN_ORDER_TEMPLATE,
+        language_code=TEMPLATE_LANG,
+        body_params=body_params,
+    )

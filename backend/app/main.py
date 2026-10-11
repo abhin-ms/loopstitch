@@ -34,6 +34,7 @@ from . import customer_auth
 from . import seo
 from . import ratelimit
 from . import order_lifecycle
+from . import owner_alerts
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -610,6 +611,7 @@ def generate_order_number() -> str:
 @app.post("/api/orders")
 def create_order(
     payload: schemas.OrderCreate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     current: models.Customer = Depends(customer_auth.get_current_customer),
 ):
@@ -750,6 +752,7 @@ def create_order(
 
     db.commit()
     db.refresh(order)
+    _alert_owner_if_cod_confirmed(background, order)
 
     return {"order": schemas.OrderOut.model_validate(order).model_dump()}
 
@@ -1132,8 +1135,25 @@ def razorpay_create_order(payload: schemas.RazorpayOrderRequest, db: Session = D
     )
 
 
-def _apply_payment(db: Session, order: models.Order, rp_order_id: str, payment_id: str, signature: str) -> str:
-    """mark_paid + commit + WhatsApp confirmation on a fresh confirmation."""
+def _queue_owner_alert(background: Optional[BackgroundTasks], order_id: int) -> None:
+    """Owner WhatsApp alert for a newly confirmed order, sent after the response when possible."""
+    if background is not None:
+        background.add_task(owner_alerts.notify_new_order_by_id, order_id)
+    else:
+        owner_alerts.notify_new_order_by_id(order_id)
+
+
+def _alert_owner_if_cod_confirmed(background: Optional[BackgroundTasks], order: models.Order) -> None:
+    """A COD order with nothing to pay online is confirmed the moment it's placed."""
+    if order.payment_method == "cod" and order_lifecycle.amount_due(order) <= 0:
+        _queue_owner_alert(background, order.id)
+
+
+def _apply_payment(
+    db: Session, order: models.Order, rp_order_id: str, payment_id: str, signature: str,
+    background: Optional[BackgroundTasks] = None,
+) -> str:
+    """mark_paid + commit + WhatsApp confirmation and owner alert on a fresh confirmation."""
     try:
         result = order_lifecycle.mark_paid(db, order, rp_order_id, payment_id, signature)
     except order_lifecycle.PaymentMismatch as exc:
@@ -1142,12 +1162,13 @@ def _apply_payment(db: Session, order: models.Order, rp_order_id: str, payment_i
     db.commit()
     db.refresh(order)
     if result == "paid":
+        _queue_owner_alert(background, order.id)
         _send_whatsapp_notification(db, order)
     return result
 
 
 @app.post("/api/razorpay/verify")
-def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session = Depends(get_db)):
+def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
     """Verify the Razorpay checkout signature and mark the order as paid."""
     if not payload.razorpay_order_id or not payload.razorpay_payment_id or not payload.razorpay_signature:
         raise HTTPException(status_code=400, detail="Missing payment verification fields")
@@ -1167,7 +1188,8 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session 
         raise HTTPException(status_code=404, detail="Order not found")
 
     # ...and mark_paid checks that Razorpay order is the one we created for THIS order.
-    result = _apply_payment(db, order, payload.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature)
+    result = _apply_payment(db, order, payload.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature,
+                            background)
     if result == "needs_refund":
         raise HTTPException(
             status_code=409,
@@ -1177,7 +1199,7 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, db: Session 
 
 
 @app.post("/api/webhooks/razorpay")
-async def razorpay_webhook(request: Request):
+async def razorpay_webhook(request: Request, background: BackgroundTasks):
     """Razorpay webhook (payment.captured / order.paid): confirms orders even if the
     shopper closed the tab before the browser could call /verify.
 
@@ -1208,7 +1230,7 @@ async def razorpay_webhook(request: Request):
             logger.warning("Razorpay webhook amount mismatch for %s: %s", order.order_number, payment.get("amount"))
             return {"status": "amount_mismatch"}
         try:
-            result = _apply_payment(db, order, rp_order_id, payment_id, "webhook")
+            result = _apply_payment(db, order, rp_order_id, payment_id, "webhook", background)
         except HTTPException as exc:
             logger.warning("Razorpay webhook for %s rejected: %s", order.order_number, exc.detail)
             return {"status": "rejected"}
@@ -1231,10 +1253,7 @@ def _build_items_summary(items: list) -> str:
 
 
 def _build_payment_label(order) -> str:
-    if order.payment_method == "cod":
-        pct = order.cod_advance_percent or 10
-        return f"COD — {pct:.0f}% paid online"
-    return "Online (Razorpay)"
+    return whatsapp_helper.payment_label(order)
 
 
 def _send_whatsapp_notification(db: Session, order) -> None:
@@ -1435,6 +1454,16 @@ def admin_resend_notification(
     ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Associated order not found")
+
+    if n.message_type == owner_alerts.MESSAGE_TYPE:
+        # owner alert: rebuild the values from the order and send to the same owner number
+        n.status = "pending"
+        n.error_message = ""
+        db.flush()
+        owner_alerts.deliver(n, owner_alerts.build_params(db, order))
+        db.commit()
+        db.refresh(n)
+        return n
 
     if n.message_type == "order_shipped":
         # tracking-id message: re-send with the same template + buttons
@@ -1870,6 +1899,7 @@ def custom_quote(payload: schemas.CustomQuoteRequest, db: Session = Depends(get_
 @app.post("/api/custom/order", response_model=schemas.OrderOut)
 def create_custom_order(
     payload: schemas.CustomOrderCreate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     current: models.Customer = Depends(customer_auth.get_current_customer),
 ):
@@ -1984,6 +2014,7 @@ def create_custom_order(
 
     db.commit()
     db.refresh(order)
+    _alert_owner_if_cod_confirmed(background, order)
     return order
 
 
