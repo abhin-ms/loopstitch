@@ -1,4 +1,6 @@
+import csv
 import hmac
+import io
 import os
 import re
 import secrets
@@ -2630,6 +2632,73 @@ def sitemap(db: Session = Depends(get_db)):
         urls.append(f"<url><loc>{SITE_URL}/blog/{escape(post.slug)}</loc>{lastmod}<priority>0.6</priority></url>")
     body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>\n"
     return Response(content=body, media_type="application/xml")
+
+
+# ============================================================
+# META (Facebook / Instagram) CATALOGUE FEED
+# Commerce Manager → Catalogue → Data sources → Data feed → paste
+# https://loopstitch.online/api/feeds/meta-catalog.csv  (Meta re-reads it on a schedule)
+# ============================================================
+META_FEED_COLUMNS = [
+    "id", "item_group_id", "title", "description", "availability", "condition", "price", "sale_price",
+    "link", "image_link", "additional_image_link", "brand", "google_product_category",
+    "color", "size", "gender", "age_group",
+]
+
+
+def _meta_feed_rows(product: models.Product):
+    """One row per colour + size (Meta's format for clothing), grouped by item_group_id."""
+    link = f"{SITE_URL}/product/{product.slug}"
+    on_sale = bool(product.compare_at_price and product.compare_at_price > product.price)
+    money = lambda amount: f"{amount:.2f} INR"  # noqa: E731
+    base = {
+        "item_group_id": f"LS{product.id}",
+        "title": seo.plain(product.name, 150),
+        "description": seo.plain(product.description or product.name, 5000),
+        "condition": "new",
+        "price": money(product.compare_at_price if on_sale else product.price),
+        "sale_price": money(product.price) if on_sale else "",
+        "link": link,
+        "brand": seo.BRAND,
+        "google_product_category": "Apparel & Accessories > Clothing > Shirts & Tops",
+        "gender": "unisex",
+        "age_group": "adult",
+    }
+    colors = sorted(product.colors, key=lambda c: c.position)
+    variants = [(c.id, c.name, c.images or product.images, c.sizes) for c in colors] or \
+        [(0, product.colorway or "", product.images, product.sizes)]
+    for color_id, color_name, images, sizes in variants:
+        urls = [seo.absolute(img.url) for img in sorted(images, key=lambda i: i.position)]
+        if not urls:
+            continue  # Meta rejects items without an image
+        for size in sorted(sizes, key=lambda x: schemas.size_sort_key(x.size)):
+            yield {
+                **base,
+                "id": f"LS{product.id}-{color_id}-{size.size}",
+                "availability": "in stock" if (size.stock or 0) > 0 else "out of stock",
+                "image_link": urls[0],
+                "additional_image_link": ",".join(urls[1:10]),
+                "color": color_name,
+                "size": size.size,
+            }
+
+
+@app.get("/api/feeds/meta-catalog.csv")
+def meta_catalog_feed(db: Session = Depends(get_db)):
+    """Every active product as a Meta Commerce Manager data feed (CSV)."""
+    products = (
+        db.query(models.Product).options(*product_load_options())
+        .filter(models.Product.is_active == True)  # noqa: E712
+        .order_by(models.Product.id).all()
+    )
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=META_FEED_COLUMNS)
+    writer.writeheader()
+    for product in products:
+        for row in _meta_feed_rows(product):
+            writer.writerow(row)
+    return Response(content=out.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=900"})
 
 
 # ============================================================
