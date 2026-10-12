@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import client from '../api/client'
 import SizeGuide from '../components/SizeGuide'
 import { SIZE_CHART } from '../utils/sizing'
+import usePageSeo from '../hooks/usePageSeo'
 
 // Answers follow the policies published on /privacy. Keep them in sync.
 function buildFaq(cod) {
@@ -47,14 +48,13 @@ function buildFaq(cod) {
 }
 
 export default function Faq() {
+  usePageSeo('faq')
   const [cod, setCod] = useState(null)
   const [guideOpen, setGuideOpen] = useState(false)
   const faq = useMemo(() => buildFaq(cod), [cod])
 
   useEffect(() => {
-    document.title = 'FAQ & size help | Loopstitch'
     client.get('/api/settings/checkout').then((res) => setCod(res.data)).catch(() => {})
-    return () => { document.title = 'Loopstitch' }
   }, [])
 
   // FAQPage markup so Google can show these answers directly in results

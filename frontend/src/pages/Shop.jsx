@@ -3,6 +3,7 @@ import client from '../api/client'
 import ProductCard from '../components/ProductCard'
 import ProductSkeleton from '../components/ProductSkeleton'
 import { useWishlist } from '../context/WishlistContext'
+import usePageSeo from '../hooks/usePageSeo'
 
 const SORTS = [
   { value: 'newest', label: 'Newest' },
@@ -15,16 +16,14 @@ const chip = (active) => `font-mono text-xs uppercase tracking-widest px-4 py-2.
 export default function Shop() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
+  // /shop?q=... (the search link Google can show under the site name) starts with that search
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('q') || '')
   const [sort, setSort] = useState('newest')
   const [inStockOnly, setInStockOnly] = useState(false)
   const [savedOnly, setSavedOnly] = useState(false)
   const wishlist = useWishlist()
 
-  useEffect(() => {
-    document.title = 'Shop unisex oversized tees | Loopstitch'
-    return () => { document.title = 'Loopstitch' }
-  }, [])
+  usePageSeo('shop')
 
   useEffect(() => {
     setLoading(true)

@@ -10,6 +10,7 @@ import StarRating from '../components/StarRating'
 import OfferBanner from '../components/OfferBanner'
 import InstagramSection from '../components/InstagramSection'
 import SocialSection from '../components/SocialSection'
+import usePageSeo from '../hooks/usePageSeo'
 
 const reveal = {
   hidden: { opacity: 0, y: 18 },
@@ -17,15 +18,12 @@ const reveal = {
 }
 
 export default function Home() {
+  usePageSeo('home')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [reviews, setReviews] = useState([])
   const reduceMotion = useReducedMotion()
 
-  useEffect(() => {
-    document.title = 'Loopstitch | Wear a drop. Or wear your own.'
-    return () => { document.title = 'Loopstitch' }
-  }, [])
 
   useEffect(() => {
     client

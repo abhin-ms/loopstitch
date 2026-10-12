@@ -27,6 +27,7 @@ const About = lazy(() => import('./pages/About'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const Landing = lazy(() => import('./pages/Landing'))
 
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
@@ -85,6 +86,11 @@ export default function App() {
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/about" element={<About />} />
+                {/* keyword landing pages — copy lives in src/content/pages.json */}
+                <Route path="/anime-oversized-tshirts" element={<Landing key="anime" pageKey="anime-oversized-tshirts" />} />
+                <Route path="/oversized-tshirts" element={<Landing key="plain" pageKey="oversized-tshirts" />} />
+                <Route path="/acid-wash-tshirts" element={<Landing key="wash" pageKey="acid-wash-tshirts" />} />
+                <Route path="/custom-tshirt-printing" element={<Landing key="custom" pageKey="custom-tshirt-printing" />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="*" element={<NotFound />} />

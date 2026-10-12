@@ -5,6 +5,7 @@ import { useCustomerAuth } from '../context/CustomerAuthContext'
 import Loader from '../components/Loader'
 import TshirtCustomizer, { BODY_FRONT, COLLAR_FRONT, NECKHOLE_FRONT, getStageBg, getLuminance } from '../components/custom/TshirtCustomizer'
 import PriceSummary from '../components/custom/PriceSummary'
+import usePageSeo from '../hooks/usePageSeo'
 
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL']
 
@@ -39,6 +40,7 @@ function TshirtPreview({ colorHex }) {
 }
 
 export default function Customize() {
+  usePageSeo('customize')
   const navigate = useNavigate()
   const { customer, isAuthenticated } = useCustomerAuth()
   const [config, setConfig] = useState(null)

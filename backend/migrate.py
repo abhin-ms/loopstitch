@@ -282,6 +282,23 @@ def ensure_enum_values() -> None:
                 print(f"  + {table.name}.{col.name} now allows {', '.join(missing)}")
 
 
+def seed_starter_posts() -> None:
+    """Journal posts every store starts with (size guide, GSM explainer). Existing slugs are left alone."""
+    from app.starter_posts import STARTER_POSTS
+    db = SessionLocal()
+    try:
+        for post in STARTER_POSTS:
+            if db.query(models.BlogPost).filter(models.BlogPost.slug == post["slug"]).first():
+                continue
+            now = models._utcnow()
+            db.add(models.BlogPost(slug=post["slug"], title=post["title"], excerpt=post["excerpt"], body=post["body"],
+                                   is_published=True, published_at=now))
+            print(f"  + journal post '{post['slug']}'")
+        db.commit()
+    finally:
+        db.close()
+
+
 def main() -> None:
     print("Loopstitch migration")
     print("1/6 creating missing tables...")
@@ -300,6 +317,8 @@ def main() -> None:
     seed_settings()
     print("6.5/6 ensuring custom t-shirt tables...")
     ensure_custom_tshirt_tables()
+    print("7/7 seeding starter journal posts...")
+    seed_starter_posts()
     print("Done.")
 
 

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import client, { mediaUrl } from '../api/client'
 import ProductSkeleton from '../components/ProductSkeleton'
+import usePageSeo from '../hooks/usePageSeo'
 
 export default function Blog() {
+  usePageSeo('blog')
   const [posts, setPosts] = useState(null)
 
   useEffect(() => {
-    document.title = 'Journal | Loopstitch'
     client.get('/api/blog').then((res) => setPosts(res.data)).catch(() => setPosts([]))
-    return () => { document.title = 'Loopstitch' }
   }, [])
 
   return (

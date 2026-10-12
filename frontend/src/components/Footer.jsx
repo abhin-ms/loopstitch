@@ -19,7 +19,11 @@ export default function Footer() {
           <div className="font-mono text-xs uppercase tracking-widest text-slate mb-4">Shop</div>
           <ul className="space-y-2 text-sm text-paper/80">
             <li><Link to="/shop" className="hover:text-acid transition-colors">All products</Link></li>
-            <li><Link to="/customize" className="hover:text-acid transition-colors">Custom printing</Link></li>
+            <li><Link to="/anime-oversized-tshirts" className="hover:text-acid transition-colors">Anime oversized t-shirts</Link></li>
+            <li><Link to="/oversized-tshirts" className="hover:text-acid transition-colors">Plain oversized t-shirts</Link></li>
+            <li><Link to="/acid-wash-tshirts" className="hover:text-acid transition-colors">Acid wash &amp; stone wash</Link></li>
+            <li><Link to="/custom-tshirt-printing" className="hover:text-acid transition-colors">Custom t-shirt printing</Link></li>
+            <li><Link to="/customize" className="hover:text-acid transition-colors">Design your own tee</Link></li>
             <li><Link to="/cart" className="hover:text-acid transition-colors">Cart</Link></li>
             <li><Link to="/app" className="hover:text-acid transition-colors">Open mobile app →</Link></li>
           </ul>

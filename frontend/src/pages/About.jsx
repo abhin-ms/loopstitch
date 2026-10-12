@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import useInstallPrompt from '../hooks/useInstallPrompt'
 import InstallAppModal from '../components/InstallAppModal'
+import usePageSeo from '../hooks/usePageSeo'
 
 // Set this once the Android build is live on Google Play — see the Play
 // Store submission notes in the PR/session for how to get there (PWABuilder
@@ -9,13 +10,10 @@ import InstallAppModal from '../components/InstallAppModal'
 const PLAY_STORE_URL = ''
 
 export default function About() {
+  usePageSeo('about')
   const { canInstall, promptInstall } = useInstallPrompt()
   const [showIOSModal, setShowIOSModal] = useState(false)
 
-  useEffect(() => {
-    document.title = 'About | Loopstitch'
-    return () => { document.title = 'Loopstitch' }
-  }, [])
 
   return (
     <div className="max-w-3xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
