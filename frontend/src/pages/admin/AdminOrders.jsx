@@ -6,6 +6,8 @@ import Loader from '../../components/Loader'
 const STATUSES = ['pending', 'paid', 'shipped', 'delivered', 'cancelled', 'failed']
 // money was actually received for these, so deleting them lowers dashboard revenue
 const PAID_STATUSES = ['paid', 'shipped', 'delivered']
+// reached the payment screen but no money came in — these are not sales
+const UNPAID_LABEL = { pending: 'Not paid yet', failed: 'Not paid — expired' }
 
 // "2026-10-06" -> "Tue, 06 Oct" (a plain date, no time/timezone shift)
 const formatDay = (day) => new Date(`${day}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })
@@ -188,7 +190,12 @@ export default function AdminOrders() {
                   onClick={() => setExpanded(expanded === order.id ? null : order.id)}
                   className="text-left flex-1 min-w-0"
                 >
-                  <p className="font-mono text-sm text-paper">#{order.order_number}</p>
+                  <p className="font-mono text-sm text-paper">
+                    #{order.order_number}
+                    {UNPAID_LABEL[order.status] && !(order.payment_method === 'cod' && !order.cod_advance_paid) && (
+                      <span className="ml-2 border border-slate text-slate text-[10px] uppercase tracking-widest px-1.5 py-0.5">{UNPAID_LABEL[order.status]}</span>
+                    )}
+                  </p>
                   <p className="font-mono text-[11px] text-slate mt-0.5 truncate">
                     {order.customer_name} · {formatDate(order.created_at)} · {formatINR(order.total)}
                     {order.order_type === 'custom' && ' · custom'}

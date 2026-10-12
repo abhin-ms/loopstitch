@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response, HTMLResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from . import models, schemas, auth
@@ -1779,7 +1779,18 @@ def track_visit(payload: schemas.TrackIn, request: Request, db: Session = Depend
 @app.get("/api/admin/stats")
 def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     total_products = db.query(models.Product).count()
-    total_orders = db.query(models.Order).count()
+    # Real orders only. Opening the payment screen creates a "pending" order that holds stock;
+    # if the shopper backs out it is never paid (and turns "failed" after the timeout) — not a sale.
+    paid_statuses = [models.OrderStatus.paid, models.OrderStatus.shipped, models.OrderStatus.delivered]
+    cod_no_advance = and_(  # COD with nothing to pay online is a confirmed order while still "pending"
+        models.Order.status == models.OrderStatus.pending,
+        models.Order.payment_method == "cod",
+        func.coalesce(models.Order.cod_advance_paid, 0) <= 0,
+    )
+    total_orders = db.query(models.Order).filter(or_(models.Order.status.in_(paid_statuses), cod_no_advance)).count()
+    unpaid_checkouts = db.query(models.Order).filter(
+        models.Order.status.in_([models.OrderStatus.pending, models.OrderStatus.failed]), ~cod_no_advance
+    ).count()
     # only real sales: unpaid (pending), failed and cancelled orders are not revenue
     revenue_sum = db.query(func.coalesce(func.sum(models.Order.total), 0.0)).filter(
         models.Order.status.in_([models.OrderStatus.paid, models.OrderStatus.shipped, models.OrderStatus.delivered])
@@ -1798,6 +1809,7 @@ def admin_stats(db: Session = Depends(get_db), current: models.Admin = Depends(a
         "page_views_total": visit_sum("page_views"),
         "total_products": total_products,
         "total_orders": total_orders,
+        "unpaid_checkouts": unpaid_checkouts,
         "revenue": float(revenue_sum),
         "low_stock_sizes": low_stock,
         "out_of_stock_sizes": out_of_stock,
