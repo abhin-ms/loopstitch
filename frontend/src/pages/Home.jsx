@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import client, { mediaUrl } from '../api/client'
+import client, { mediaUrl, responsive } from '../api/client'
 import ProductCard from '../components/ProductCard'
 import ProductSkeleton from '../components/ProductSkeleton'
 import TrustStrip from '../components/TrustStrip'
@@ -38,8 +38,8 @@ export default function Home() {
   }, [])
 
   const heroImages = products
-    .map((p) => (p.colors?.[0]?.images?.[0] || p.images?.[0])?.url)
-    .filter(Boolean)
+    .map((p) => ({ image: p.colors?.[0]?.images?.[0] || p.images?.[0], name: p.name }))
+    .filter((hero) => hero.image?.url)
     .slice(0, 3)
 
   return (
@@ -95,13 +95,13 @@ export default function Home() {
               initial={reduceMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
               className="relative hidden lg:block h-[34rem]" aria-hidden="true"
             >
-              {heroImages.map((url, i) => (
+              {heroImages.map(({ image, name }, i) => (
                 <div
-                  key={url}
+                  key={image.url}
                   className="absolute w-[58%] aspect-[4/5] overflow-hidden border border-panel-2 shadow-2xl bg-panel"
                   style={{ top: `${i * 9}%`, left: `${i * 21}%`, transform: `rotate(${(i - 1) * 4}deg)`, zIndex: i }}
                 >
-                  <img src={mediaUrl(url)} alt="" className="w-full h-full object-cover" fetchPriority={i === 0 ? 'high' : undefined} decoding="async" />
+                  <img src={mediaUrl(image.url)} {...responsive(image, '(min-width: 1024px) 28vw, 58vw')} alt={`${name} – unisex oversized t-shirt`} width="800" height="1000" className="w-full h-full object-cover" fetchPriority={i === 0 ? 'high' : undefined} decoding="async" />
                 </div>
               ))}
               <span className="sticker absolute -bottom-2 right-2 z-10 bg-acid text-ink font-mono text-[11px] font-bold px-3 py-1.5 uppercase tracking-wider">

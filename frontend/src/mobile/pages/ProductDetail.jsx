@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import client, { mediaUrl } from '../../api/client'
+import client, { mediaUrl, responsive } from '../../api/client'
 import { useCart } from '../../context/CartContext'
 import { formatINR } from '../../utils/format'
 import { useToast } from '../context/ToastContext'
@@ -48,7 +48,8 @@ export default function MobileProductDetail() {
     ? product.colors
     : [{ id: null, name: product.colorway || 'Default', hex_code: '#000000', images: product.images || [], sizes: product.sizes || [] }]
   const selectedColor = colors.find((c) => c.id === selectedColorId) || colors[0]
-  const image = selectedColor.images?.[0]?.url
+  const picture = selectedColor.images?.[0]
+  const image = picture?.url
   const sizes = selectedColor.sizes || []
   const sizeRow = sizes.find((s) => s.size === selectedSize)
   const maxForSize = sizeRow?.stock ?? 0
@@ -65,7 +66,7 @@ export default function MobileProductDetail() {
     <div>
       <div className="ls-swatch" style={{ aspectRatio: '1 / 1' }}>
         {image ? (
-          <img src={mediaUrl(image)} alt={product.name} />
+          <img src={mediaUrl(image)} {...responsive(picture, '100vw')} alt={`${product.name} – unisex oversized t-shirt in ${selectedColor.name}`} width="800" height="800" fetchPriority="high" />
         ) : (
           <span style={{ fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.05em', color: 'var(--ls-text-muted)' }}>
             PRODUCT PHOTO

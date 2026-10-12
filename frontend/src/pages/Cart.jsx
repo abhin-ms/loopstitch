@@ -57,7 +57,7 @@ export default function Cart() {
                 className="flex gap-4 py-5 border-b border-panel-2"
               >
                 <div className="w-20 h-24 bg-panel shrink-0 overflow-hidden">
-                  {item.image && <img src={mediaUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />}
+                  {item.image && <img src={mediaUrl(item.image)} alt={item.name} loading="lazy" decoding="async" width="160" height="200" className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between gap-3 min-w-0">

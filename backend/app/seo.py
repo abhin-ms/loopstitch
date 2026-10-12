@@ -82,7 +82,7 @@ def breadcrumbs(*crumbs) -> dict:
 
 
 def inject(page: str, *, title: str, description: str, url: str, image: str, og_type: str,
-           json_ld=None, body: str = "") -> str:
+           json_ld=None, body: str = "", preload: str = "") -> str:
     """Fill in the route's <head> and (optionally) put real, crawlable content inside #root.
     React replaces that content with the same page as soon as it starts."""
     page = re.sub(r"<title>.*?</title>", lambda _: f"<title>{html.escape(title)}</title>", page, count=1, flags=re.S)
@@ -95,7 +95,7 @@ def inject(page: str, *, title: str, description: str, url: str, image: str, og_
     page = _set_meta(page, "name", "twitter:title", title)
     page = _set_meta(page, "name", "twitter:description", description)
     page = _set_meta(page, "name", "twitter:image", image)
-    extra = f'    <link rel="canonical" href="{html.escape(url, quote=True)}" />\n'
+    extra = f'    <link rel="canonical" href="{html.escape(url, quote=True)}" />\n' + preload
     for block in (json_ld if isinstance(json_ld, list) else [json_ld] if json_ld else []):
         # "</" is escaped so text in the data can never close the script tag
         data = json.dumps(block, ensure_ascii=False).replace("</", "<\\/")
@@ -137,9 +137,25 @@ def matching_products(page: dict, products) -> list:
     return hits or list(products)
 
 
+def preload_image(image, sizes: str) -> str:
+    """Start downloading the page's main photo with the HTML instead of after the JavaScript
+    (it is the largest thing on screen). Uses the WebP copies when the image has them."""
+    if image is None:
+        return ""
+    attrs = f'href="{e(absolute(image.url))}"'
+    if image.webp_base:
+        base = absolute(image.webp_base)
+        attrs += f' imagesrcset="{e(base)}_w640.webp 640w, {e(base)}_w1280.webp 1280w" imagesizes="{e(sizes)}"'
+    return f'    <link rel="preload" as="image" fetchpriority="high" {attrs} />\n'
+
+
 def product_page(page: str, product, with_body: bool = True) -> str:
     colors = list(product.colors or [])
-    images = [img.url for c in colors for img in (c.images or [])] or [img.url for img in (product.images or [])]
+    by_order = lambda imgs: sorted(imgs or [], key=lambda i: (i.position, i.id))  # noqa: E731
+    images = [img.url for c in sorted(colors, key=lambda c: c.position) for img in by_order(c.images)] or [img.url for img in by_order(product.images)]
+    # the photo the product page opens on: first colour's first image
+    ordered = sorted(colors, key=lambda c: c.position)
+    first_image = next(iter(sorted((ordered[0].images if ordered else product.images) or [], key=lambda i: (i.position, i.id))), None)
     in_stock = (product.total_stock or 0) > 0
     title = product.meta_title or f"{product.name} | Unisex Oversized T-Shirt | {BRAND}"
     description = plain(product.meta_description or product.description or f"{product.name}, a unisex oversized tee from {BRAND}.")
@@ -179,7 +195,8 @@ def product_page(page: str, product, with_body: bool = True) -> str:
             + (f"<p>Sizes: {e(', '.join(sizes))} · Unisex oversized fit</p>" if sizes else "")
         )
     return inject(page, title=title, description=description, url=url, image=absolute(images[0] if images else ""),
-                  og_type="product", json_ld=[json_ld, breadcrumbs(("Shop", "/shop"), (product.name, f"/product/{product.slug}"))], body=body)
+                  og_type="product", json_ld=[json_ld, breadcrumbs(("Shop", "/shop"), (product.name, f"/product/{product.slug}"))], body=body,
+                  preload=preload_image(first_image, "(min-width: 768px) 50vw, 100vw") if with_body else "")
 
 
 def blog_page(page: str, post, with_body: bool = True) -> str:

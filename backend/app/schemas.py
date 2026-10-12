@@ -20,6 +20,7 @@ class TokenResponse(BaseModel):
 class ProductImageOut(BaseModel):
     id: int
     url: str
+    webp_base: Optional[str] = None  # storefront builds <webp_base>_w640.webp / _w1280.webp for srcset
     position: int
 
     class Config:

@@ -34,7 +34,7 @@ export default function AddedToCart({ item, onClose }) {
             </div>
             <div className="flex gap-3 items-center">
               {item.image ? (
-                <img src={mediaUrl(item.image)} alt="" className="w-14 h-16 object-cover bg-panel-2 shrink-0" />
+                <img src={mediaUrl(item.image)} alt="" width="56" height="64" className="w-14 h-16 object-cover bg-panel-2 shrink-0" />
               ) : (
                 <div className="w-14 h-16 bg-panel-2 shrink-0" />
               )}

@@ -1,17 +1,18 @@
 import { useNavigate } from 'react-router-dom'
-import { mediaUrl } from '../../api/client'
+import { mediaUrl, responsive } from '../../api/client'
 import { formatINR } from '../../utils/format'
 
 export default function ProductTile({ product }) {
   const navigate = useNavigate()
-  const image = product.colors?.[0]?.images?.[0]?.url || product.images?.[0]?.url
+  const picture = product.colors?.[0]?.images?.[0] || product.images?.[0]
+  const image = picture?.url
   const soldOut = (product.total_stock ?? 0) === 0
 
   return (
     <div onClick={() => navigate(`/app/product/${product.slug}`)} style={{ cursor: 'pointer' }}>
       <div className="ls-swatch" style={{ aspectRatio: '4 / 5' }}>
         {image ? (
-          <img src={mediaUrl(image)} alt={product.name} loading="lazy" />
+          <img src={mediaUrl(image)} {...responsive(picture, '50vw')} alt={`${product.name} – unisex oversized t-shirt`} loading="lazy" decoding="async" width="640" height="800" />
         ) : (
           <span style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.05em', color: 'var(--ls-text-muted)' }}>
             PRODUCT PHOTO

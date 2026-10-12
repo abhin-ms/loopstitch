@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import client, { mediaUrl } from '../api/client'
+import client, { mediaUrl, responsive } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { formatINR } from '../utils/format'
 import SizePicker from '../components/SizePicker'
@@ -154,7 +154,8 @@ export default function ProductDetail() {
                 <motion.img
                   key={activeImage}
                   src={mediaUrl(images[activeImage]?.url)}
-                  alt={product.name}
+                  {...responsive(images[activeImage], '(min-width: 768px) 50vw, 100vw')}
+                  alt={`${product.name} – unisex oversized t-shirt in ${selectedColor.name}${activeImage ? `, view ${activeImage + 1}` : ''}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -192,7 +193,7 @@ export default function ProductDetail() {
                   onClick={() => setActiveImage(i)}
                   className={`w-16 h-16 sm:w-20 sm:h-20 shrink-0 overflow-hidden border ${i === activeImage ? 'border-acid' : 'border-panel-2'}`}
                 >
-                  <img src={mediaUrl(img.url)} alt="" className="w-full h-full object-cover" />
+                  <img src={mediaUrl(img.url)} {...responsive(img, '80px')} alt={`${product.name} in ${selectedColor.name} – view ${i + 1}`} loading="lazy" decoding="async" width="160" height="160" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

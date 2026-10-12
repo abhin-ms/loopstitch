@@ -50,7 +50,7 @@ export default function BlogPost() {
       <Link to="/blog" className="font-mono text-xs text-slate hover:text-paper uppercase tracking-widest py-2 inline-block mb-6">← Journal</Link>
       <p className="font-mono text-[11px] text-slate uppercase tracking-widest">{new Date(post.published_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       <h1 className="font-display text-4xl sm:text-6xl uppercase text-paper leading-none mt-2 mb-6">{post.title}</h1>
-      {post.cover_url && <img src={mediaUrl(post.cover_url)} alt="" className="w-full aspect-[16/9] object-cover border border-panel-2 mb-8" fetchPriority="high" />}
+      {post.cover_url && <img src={mediaUrl(post.cover_url)} alt={post.title} width="1280" height="720" className="w-full aspect-[16/9] object-cover border border-panel-2 mb-8" fetchPriority="high" />}
       <ArticleBody text={post.body} />
       <div className="mt-14 border border-panel-2 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <p className="font-display text-2xl uppercase text-paper">Find your next oversized tee</p>

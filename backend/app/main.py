@@ -33,6 +33,7 @@ from . import courier
 from . import launch_alerts
 from . import mailer
 from . import meta_capi
+from . import imaging
 from . import customer_auth
 from . import seo
 from . import ratelimit
@@ -551,10 +552,13 @@ async def upload_product_images(
             models.ProductImage.color_id == color_id,
         ).scalar()
         position = 0 if last is None else last + 1
+        webp_base = imaging.store_variants(
+            contents, fname, url, lambda data, name, ctype: store_upload(data, name, ctype, "products"))
         db.add(models.ProductImage(
             product_id=product_id, color_id=color_id,
-            url=url, position=position
+            url=url, webp_base=webp_base, position=position
         ))
+        db.flush()  # so the next file in this request sees this one and gets the following position
 
     db.commit()
     db.refresh(product)
@@ -589,15 +593,18 @@ def delete_product_image(product_id: int, image_id: int, db: Session = Depends(g
     ).first()
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
-    if image.url.startswith("http"):
-        gcs.delete_from_gcs(gcs.get_filename_from_url(image.url))
-    else:
-        try:
-            fpath = os.path.join(os.path.dirname(os.path.dirname(__file__)), image.url.lstrip("/"))
-            if os.path.exists(fpath):
-                os.remove(fpath)
-        except OSError:
-            pass
+    # the original plus its WebP copies
+    urls = [image.url] + ([f"{image.webp_base}_w{w}.webp" for w in imaging.WIDTHS] if image.webp_base else [])
+    for url in urls:
+        if url.startswith("http"):
+            gcs.delete_from_gcs(gcs.get_filename_from_url(url))
+        else:
+            try:
+                fpath = os.path.join(os.path.dirname(os.path.dirname(__file__)), url.lstrip("/"))
+                if os.path.exists(fpath):
+                    os.remove(fpath)
+            except OSError:
+                pass
     db.delete(image)
     db.commit()
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
@@ -2694,7 +2701,7 @@ def _meta_feed_rows(product: models.Product):
     variants = [(c.id, c.name, c.images or product.images, c.sizes) for c in colors] or \
         [(0, product.colorway or "", product.images, product.sizes)]
     for color_id, color_name, images, sizes in variants:
-        urls = [seo.absolute(img.url) for img in sorted(images, key=lambda i: i.position)]
+        urls = [seo.absolute(img.url) for img in sorted(images, key=lambda i: (i.position, i.id))]
         if not urls:
             continue  # Meta rejects items without an image
         for size in sorted(sizes, key=lambda x: schemas.size_sort_key(x.size)):

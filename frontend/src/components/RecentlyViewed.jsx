@@ -15,7 +15,7 @@ export default function RecentlyViewed({ excludeSlug }) {
         {items.map((r) => (
           <Link key={r.slug} to={`/product/${r.slug}`} className="group w-36 sm:w-44 shrink-0 snap-start">
             <div className="aspect-[4/5] bg-panel overflow-hidden">
-              {r.image && <img src={mediaUrl(r.image)} alt={r.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
+              {r.image && <img src={mediaUrl(r.image)} alt={`${r.name} – unisex oversized t-shirt`} loading="lazy" decoding="async" width="400" height="500" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
             </div>
             <p className="text-sm text-paper mt-2 leading-snug">{r.name}</p>
             <p className="font-mono text-xs text-slate mt-0.5">{formatINR(r.price)}</p>

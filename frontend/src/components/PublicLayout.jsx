@@ -41,7 +41,9 @@ export default function PublicLayout() {
       <AnnouncementBar />
       <InstallAppBanner />
       <Navbar />
-      <main id="main" className="flex-1">
+      {/* min-h-screen: the footer starts below the fold, so it can't jump down the screen
+          when the page content arrives (that jump was a 0.56 layout shift on mobile) */}
+      <main id="main" className="flex-1 min-h-screen">
         <Suspense fallback={<Loader label="Loading" />}>
           <Outlet />
         </Suspense>

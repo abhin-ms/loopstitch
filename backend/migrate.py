@@ -89,6 +89,7 @@ def ensure_columns() -> None:
         ],
         "product_images": [
             models.ProductImage.color_id,
+            models.ProductImage.webp_base,
         ],
         "product_sizes": [
             models.ProductSize.color_id,

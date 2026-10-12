@@ -39,4 +39,13 @@ export const mediaUrl = (path) => {
   return `${API_BASE}${path}`
 }
 
+// srcset of the smaller WebP copies made on upload (backend/app/imaging.py). Spread onto an <img>
+// whose src is the original: <img src={mediaUrl(img.url)} {...responsive(img, '50vw')} />.
+// Images uploaded before the copies existed simply get no srcset.
+export const responsive = (image, sizes) => {
+  if (!image?.webp_base) return {}
+  const base = mediaUrl(image.webp_base)
+  return { srcSet: `${base}_w640.webp 640w, ${base}_w1280.webp 1280w`, sizes }
+}
+
 export default client

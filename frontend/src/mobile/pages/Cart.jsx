@@ -28,7 +28,7 @@ export default function MobileCart() {
         <div key={item.key} style={{ display: 'flex', gap: 12, padding: '14px 0', borderBottom: '1px solid var(--ls-divider)' }}>
           <div className="ls-swatch" style={{ width: 64, height: 76, flex: 'none' }}>
             {item.image ? (
-              <img src={mediaUrl(item.image)} alt={item.name} />
+              <img src={mediaUrl(item.image)} alt={item.name} loading="lazy" decoding="async" width="160" height="200" />
             ) : (
               <span style={{ fontFamily: 'monospace', fontSize: 7, color: 'var(--ls-text-muted)' }}>PHOTO</span>
             )}

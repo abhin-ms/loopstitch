@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { mediaUrl } from '../api/client'
+import { mediaUrl, responsive } from '../api/client'
 import { formatINR } from '../utils/format'
 import { useWishlist } from '../context/WishlistContext'
 import { haptic } from '../utils/haptics'
@@ -9,8 +9,11 @@ import { HeartIcon } from './LikeButton'
 export default function ProductCard({ product, index = 0 }) {
   const wishlist = useWishlist()
   const wished = wishlist.has(product.id)
-  const primaryImage = product.images?.[0]?.url
-  const secondaryImage = product.images?.[1]?.url
+  const primary = product.images?.[0]
+  const secondary = product.images?.[1]
+  const primaryImage = primary?.url
+  const secondaryImage = secondary?.url
+  const cardSizes = '(min-width: 1024px) 25vw, 50vw'
   const totalStock = product.total_stock ?? 0
   const isSoldOut = totalStock === 0
   const isLowStock = totalStock > 0 && totalStock <= 6
@@ -27,7 +30,8 @@ export default function ProductCard({ product, index = 0 }) {
           {primaryImage ? (
             <img
               src={mediaUrl(primaryImage)}
-              alt={product.name}
+              {...responsive(primary, cardSizes)}
+              alt={`${product.name} – unisex oversized t-shirt`}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 group-hover:opacity-0"
               loading="lazy"
               decoding="async"
@@ -40,9 +44,13 @@ export default function ProductCard({ product, index = 0 }) {
           {secondaryImage && (
             <img
               src={mediaUrl(secondaryImage)}
+              {...responsive(secondary, cardSizes)}
               alt=""
               className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               loading="lazy"
+              decoding="async"
+              width="800"
+              height="1000"
             />
           )}
           <button

@@ -40,7 +40,7 @@ class Product(Base):
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.position")
+    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.position, ProductImage.id")
     sizes = relationship("ProductSize", back_populates="product", cascade="all, delete-orphan")
     colors = relationship("ProductColor", back_populates="product", cascade="all, delete-orphan", order_by="ProductColor.position")
     order_items = relationship("OrderItem", back_populates="product")
@@ -63,7 +63,7 @@ class ProductColor(Base):
     position = Column(Integer, default=0)
 
     product = relationship("Product", back_populates="colors")
-    images = relationship("ProductImage", back_populates="color", cascade="all, delete-orphan", order_by="ProductImage.position")
+    images = relationship("ProductImage", back_populates="color", cascade="all, delete-orphan", order_by="ProductImage.position, ProductImage.id")
     sizes = relationship("ProductSize", back_populates="color", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint("product_id", "name", name="uq_product_color_name"),)
@@ -76,6 +76,8 @@ class ProductImage(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     color_id = Column(Integer, ForeignKey("product_colors.id"), nullable=True)
     url = Column(String(500), nullable=False)
+    # URL prefix of the responsive WebP copies (<webp_base>_w640.webp, _w1280.webp); see imaging.py
+    webp_base = Column(String(500), nullable=True)
     position = Column(Integer, default=0)
 
     product = relationship("Product", back_populates="images")
