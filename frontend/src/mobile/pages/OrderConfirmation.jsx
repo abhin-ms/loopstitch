@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import client from '../../api/client'
 import { CheckIcon } from '../icons'
+import { purchase } from '../../utils/pixel'
 
 export default function MobileOrderConfirmation() {
   const location = useLocation()
@@ -13,6 +14,8 @@ export default function MobileOrderConfirmation() {
     if (!orderFromState?.order_number || order) return
     client.get(`/api/orders/${orderFromState.order_number}`).then((res) => setOrder(res.data)).catch(() => {})
   }, [orderFromState, order])
+
+  useEffect(() => { purchase(order) }, [order])  // Meta Pixel, once per order
 
   if (!order) {
     return (

@@ -6,6 +6,7 @@ import { formatINR } from '../../utils/format'
 import { useToast } from '../context/ToastContext'
 import StitchLoader from '../components/StitchLoader'
 import LikeButton from '../../components/LikeButton'
+import { viewContent } from '../../utils/pixel'
 
 export default function MobileProductDetail() {
   const { slug } = useParams()
@@ -25,6 +26,7 @@ export default function MobileProductDetail() {
     client.get(`/api/products/${slug}`)
       .then((res) => {
         setProduct(res.data)
+        viewContent(res.data)
         setSelectedColorId(res.data.colors?.[0]?.id || null)
         setSelectedSize(null)
       })

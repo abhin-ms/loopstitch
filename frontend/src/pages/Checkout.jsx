@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { initiateCheckout } from '../utils/pixel'
 import { useNavigate, Link } from 'react-router-dom'
 import client from '../api/client'
 import { loadRazorpay } from '../utils/razorpay'
@@ -42,6 +43,8 @@ export default function Checkout() {
 
   // Razorpay's script is only needed here, so load it on demand instead of on every page
   useEffect(() => { loadRazorpay() }, [])
+  // Meta Pixel: checkout started, with whatever was in the cart on arrival
+  useEffect(() => { initiateCheckout(items, subtotal) }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load checkout settings
   useEffect(() => {

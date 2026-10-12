@@ -161,6 +161,7 @@ class OrderCreate(BaseModel):
 
 class OrderItemOut(BaseModel):
     id: int
+    product_id: Optional[int] = None
     product_name: str
     color_id: Optional[int] = None
     color_name: Optional[str] = ""

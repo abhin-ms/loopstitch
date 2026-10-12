@@ -17,6 +17,7 @@ import { pushRecent } from '../utils/recentlyViewed'
 import { removeServerLd } from '../utils/serverLd'
 import { useWishlist } from '../context/WishlistContext'
 import { haptic } from '../utils/haptics'
+import { viewContent } from '../utils/pixel'
 
 export default function ProductDetail() {
   const { slug } = useParams()
@@ -48,6 +49,7 @@ export default function ProductDetail() {
       .get(`/api/products/${slug}`)
       .then((res) => {
         setProduct(res.data)
+        viewContent(res.data)
         pushRecent({ slug: res.data.slug, name: res.data.name, price: res.data.price, image: (res.data.colors?.[0]?.images || res.data.images || [])[0]?.url || '' })
         setActiveImage(0)
         setSelectedColorId(res.data.colors?.[0]?.id || null)

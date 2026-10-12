@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { addToCart } from '../utils/pixel'
 
 const CartContext = createContext(null)
 const STORAGE_KEY = 'loopstitch_cart'
@@ -30,6 +31,7 @@ export function CartProvider({ children }) {
   }
 
   const addItem = (product, color, size, quantity, maxStock) => {
+    addToCart(product, color?.id, size, quantity)  // Meta Pixel
     setItems((prev) => {
       const colorId = color?.id || ''
       const key = `${product.id}-${colorId}-${size}`

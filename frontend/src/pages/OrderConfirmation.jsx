@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { formatINR, formatDate } from '../utils/format'
 import client from '../api/client'
+import { purchase } from '../utils/pixel'
 
 export default function OrderConfirmation() {
   const location = useLocation()
@@ -17,6 +18,8 @@ export default function OrderConfirmation() {
       setOrder(res.data)
     }).catch(() => {})
   }, [orderFromState, order])
+
+  useEffect(() => { purchase(order) }, [order])  // Meta Pixel, once per order
 
   useEffect(() => {
     if (!order?.order_number || paymentVerified !== null) return

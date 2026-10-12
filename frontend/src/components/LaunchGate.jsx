@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import client from '../api/client'
 import Loader from './Loader'
 import { useAdminAuth } from '../context/AdminAuthContext'
+import { pageView } from '../utils/pixel'
 
 const LaunchingSoon = lazy(() => import('../pages/LaunchingSoon'))
 const VISIT_KEY = 'loopstitch_visit_counted'
@@ -31,6 +32,7 @@ export default function LaunchGate() {
   useEffect(() => {
     if (adminLoading || isAuthenticated) return
     trackPageView()
+    pageView()  // Meta Pixel
   }, [pathname, adminLoading, isAuthenticated])
 
   useEffect(() => {
