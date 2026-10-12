@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import client from '../api/client'
 import Loader from './Loader'
 import { useAdminAuth } from '../context/AdminAuthContext'
-import { pageView } from '../utils/pixel'
+import { configure as configureAnalytics, pageView } from '../utils/pixel'
 
 const LaunchingSoon = lazy(() => import('../pages/LaunchingSoon'))
 const VISIT_KEY = 'loopstitch_visit_counted'
@@ -38,8 +38,14 @@ export default function LaunchGate() {
   useEffect(() => {
     client
       .get('/api/settings/launch')
-      .then((res) => setLaunch(res.data))
-      .catch(() => setLaunch({ launch_mode: false })) // never lock visitors out because of a network blip
+      .then((res) => {
+        setLaunch(res.data)
+        configureAnalytics({ pixelId: res.data.meta_pixel_id, ga4Id: res.data.ga4_id })
+      })
+      .catch(() => {
+        setLaunch({ launch_mode: false }) // never lock visitors out because of a network blip
+        configureAnalytics()
+      })
   }, [])
 
   if (!launch || adminLoading) return <Loader label="Loading" />

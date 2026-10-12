@@ -414,6 +414,8 @@ class PublicLaunchSettings(BaseModel):
     launch_mode: bool
     launch_date: str = ""
     launch_message: str = ""
+    meta_pixel_id: str = ""
+    ga4_id: str = ""
 
 
 class PublicShippingSettings(BaseModel):

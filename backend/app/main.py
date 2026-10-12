@@ -32,6 +32,7 @@ from . import delhivery as delhivery_helper
 from . import courier
 from . import launch_alerts
 from . import mailer
+from . import meta_capi
 from . import customer_auth
 from . import seo
 from . import ratelimit
@@ -1031,6 +1032,9 @@ def public_launch_settings(db: Session = Depends(get_db)):
         launch_mode=launch_on,
         launch_date=raw.get("launch_date", ""),
         launch_message=raw.get("launch_message", ""),
+        # analytics ids for the storefront (public by nature: they are in every page's requests)
+        meta_pixel_id=meta_capi.PIXEL_ID,
+        ga4_id=os.getenv("GA4_ID", ""),
     )
 
 
@@ -1159,9 +1163,9 @@ def _alert_owner_if_cod_confirmed(background: Optional[BackgroundTasks], order: 
 
 def _apply_payment(
     db: Session, order: models.Order, rp_order_id: str, payment_id: str, signature: str,
-    background: Optional[BackgroundTasks] = None,
+    background: Optional[BackgroundTasks] = None, client: Optional[dict] = None,
 ) -> str:
-    """mark_paid + commit + WhatsApp confirmation and owner alert on a fresh confirmation."""
+    """mark_paid + commit + WhatsApp confirmation, owner alert and Meta purchase event on a fresh confirmation."""
     try:
         result = order_lifecycle.mark_paid(db, order, rp_order_id, payment_id, signature)
     except order_lifecycle.PaymentMismatch as exc:
@@ -1170,13 +1174,14 @@ def _apply_payment(
     db.commit()
     db.refresh(order)
     if result == "paid":
+        meta_capi.send_purchase(order, client)  # server-side copy of the Pixel's Purchase (deduplicated)
         _queue_owner_alert(background, order.id)
         _send_whatsapp_notification(db, order)
     return result
 
 
 @app.post("/api/razorpay/verify")
-def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     """Verify the Razorpay checkout signature and mark the order as paid."""
     if not payload.razorpay_order_id or not payload.razorpay_payment_id or not payload.razorpay_signature:
         raise HTTPException(status_code=400, detail="Missing payment verification fields")
@@ -1197,7 +1202,9 @@ def razorpay_verify_payment(payload: schemas.RazorpayVerifyRequest, background: 
 
     # ...and mark_paid checks that Razorpay order is the one we created for THIS order.
     result = _apply_payment(db, order, payload.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature,
-                            background)
+                            background,
+                            client={"ip": ratelimit.client_ip(request), "user_agent": request.headers.get("user-agent", ""),
+                                    "fbp": request.cookies.get("_fbp", ""), "fbc": request.cookies.get("_fbc", "")})
     if result == "needs_refund":
         raise HTTPException(
             status_code=409,
