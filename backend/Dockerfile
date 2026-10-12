@@ -12,6 +12,8 @@ WORKDIR /app/backend
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./
+# page titles / landing copy: one file shared by the React app and the server-rendered HTML
+COPY frontend/src/content/pages.json ./app/seo_pages.json
 
 COPY backend/nginx.conf /etc/nginx/sites-available/default
 COPY backend/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

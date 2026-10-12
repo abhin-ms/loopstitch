@@ -1,0 +1,240 @@
+{
+  "home": {
+    "path": "/",
+    "title": "Loopstitch | Anime Streetwear Brand India",
+    "description": "Loopstitch is an anime streetwear brand from India: unisex oversized t-shirts in premium 250 GSM fabric, limited drops and custom printing from one piece.",
+    "h1": "Wear a drop. Or wear your own.",
+    "intro": [
+      "Loopstitch makes unisex oversized t-shirts in premium 250 GSM fabric: anime-inspired designs, plain colours, stone wash and acid wash tees, printed in small batches and never restocked.",
+      "Have your own artwork? We print custom t-shirts in-house, from a single piece."
+    ],
+    "links": [
+      "anime-oversized-tshirts",
+      "oversized-tshirts",
+      "acid-wash-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "shop": {
+    "path": "/shop",
+    "title": "Oversized T-Shirts Online India | Loopstitch",
+    "description": "Shop unisex oversized t-shirts: anime-inspired prints, plain colours, stone wash and acid wash tees in premium 250 GSM fabric. Shipped across India.",
+    "h1": "Shop the drop",
+    "intro": [
+      "Every tee is cut unisex with a relaxed, dropped-shoulder fit, in premium 250 GSM fabric. Limited pieces: once a size sells out it is retired, not restocked."
+    ],
+    "links": [
+      "anime-oversized-tshirts",
+      "oversized-tshirts",
+      "acid-wash-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "customize": {
+    "path": "/customize",
+    "title": "Design Your Custom T-Shirt Online | Loopstitch",
+    "description": "Design a custom oversized t-shirt online: pick colours and sizes, upload your artwork and we print it in-house on premium 250 GSM fabric. From one piece.",
+    "h1": "Make it yours.",
+    "intro": [
+      "Pick your colours and sizes, then send us your artwork. We print it in-house on the same premium 250 GSM oversized tee as our drops, from a single piece."
+    ],
+    "links": [
+      "custom-tshirt-printing"
+    ]
+  },
+  "faq": {
+    "path": "/faq",
+    "title": "FAQ, Size Guide & Shipping | Loopstitch",
+    "description": "Answers about Loopstitch oversized t-shirts: sizing and fit, fabric, shipping across India, returns, payments and custom printing.",
+    "h1": "FAQ & size help",
+    "intro": [
+      "Sizing and fit, fabric and care, shipping across India, returns, payments and custom orders."
+    ],
+    "links": []
+  },
+  "about": {
+    "path": "/about",
+    "title": "About Loopstitch | Anime Streetwear Brand India",
+    "description": "Loopstitch is an online streetwear brand from India: unisex oversized t-shirts, anime-inspired limited drops and custom printing done in-house.",
+    "h1": "Built for people who read the credits.",
+    "intro": [
+      "Loopstitch is an online streetwear brand from India. We make unisex oversized t-shirts in premium 250 GSM fabric: anime-inspired designs released in limited drops, and custom printing done in-house."
+    ],
+    "links": [
+      "anime-oversized-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "blog": {
+    "path": "/blog",
+    "title": "Streetwear Journal & T-Shirt Guides | Loopstitch",
+    "description": "Guides from Loopstitch: oversized t-shirt sizing, fabric weight (GSM) explained, print care and what goes into each drop.",
+    "h1": "Style notes & drop stories",
+    "intro": [
+      "Guides on sizing, fabric and print care, and the stories behind each drop."
+    ],
+    "links": []
+  },
+  "anime-oversized-tshirts": {
+    "path": "/anime-oversized-tshirts",
+    "landing": true,
+    "breadcrumb": "Anime oversized t-shirts",
+    "title": "Anime Oversized T-Shirts India | Loopstitch",
+    "description": "Anime oversized t-shirts from Loopstitch: original anime-inspired artwork on premium 250 GSM unisex tees. Limited drops, never restocked, shipped across India.",
+    "eyebrow": "Anime-inspired · Limited drops",
+    "h1": "Anime oversized t-shirts",
+    "match": [
+      "anime"
+    ],
+    "intro": [
+      "Loopstitch started with one idea: anime t-shirts in India should feel like streetwear, not souvenir merch. Our anime oversized t-shirts carry original, anime-inspired artwork drawn for the tee itself, printed large on a relaxed, dropped-shoulder cut that anyone can wear."
+    ],
+    "sections": [
+      {
+        "heading": "Printed on premium 250 GSM fabric",
+        "body": [
+          "Every anime oversized t-shirt is printed in-house on premium 250 GSM fabric, the same blank we use across the whole range. The weight gives the tee its shape: the shoulders drop cleanly, the body hangs straight and the print stays flat instead of clinging. Sizes run S, M, L and XL in a unisex fit. Most people take their usual size for the intended oversized look."
+        ]
+      },
+      {
+        "heading": "Limited drops, never restocked",
+        "body": [
+          "We print each design in a small batch. When a size sells out it is retired rather than restocked, so the anime t-shirt you pick up is not one you will see everywhere. New drops are announced on Instagram at @loopstitch_co first.",
+          "Orders ship across India with tracking, usually within three days. If the design you want is gone, you can also send us your own artwork and we will print a custom tee from a single piece."
+        ]
+      }
+    ],
+    "cta": {
+      "label": "Shop all oversized tees",
+      "to": "/shop"
+    },
+    "links": [
+      "oversized-tshirts",
+      "acid-wash-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "oversized-tshirts": {
+    "path": "/oversized-tshirts",
+    "landing": true,
+    "breadcrumb": "Plain oversized t-shirts",
+    "title": "Plain Oversized T-Shirts for Men & Women | Loopstitch",
+    "description": "Plain oversized t-shirts in premium 250 GSM fabric: unisex drop-shoulder tees in solid colours, sizes S to XL. Limited pieces, shipped across India.",
+    "eyebrow": "Solid colours · Unisex fit",
+    "h1": "Plain oversized t-shirts",
+    "match": [
+      "optic white",
+      "jet black",
+      "dusty rose",
+      "mocha",
+      "plain",
+      "solid"
+    ],
+    "intro": [
+      "A plain oversized t-shirt only works if the fabric and the cut are right, because there is no print to hide behind. Ours is a unisex, drop-shoulder tee in premium 250 GSM fabric with a thick ribbed crew neck that keeps its shape wash after wash."
+    ],
+    "sections": [
+      {
+        "heading": "Colours that go with everything",
+        "body": [
+          "The plain range covers the colours you actually reach for: a clean optic white, a deep jet black and softer shades such as dusty rose and mocha brown. Wear one on its own with cargos or denim, or layer it under an overshirt. Because every colour uses the same blank, the fit stays identical across the range, so once you know your size you can order any colour with confidence."
+        ]
+      },
+      {
+        "heading": "Fit and sizing",
+        "body": [
+          "Sizes run S, M, L and XL. The cut is relaxed through the chest with dropped shoulders, so your usual size gives the intended oversized look; if you normally buy women's sizes, go one down for a closer fit. The size guide on each product page lists chest and length measurements.",
+          "Like everything we make, plain tees are produced in limited pieces and shipped across India with tracking."
+        ]
+      }
+    ],
+    "cta": {
+      "label": "Shop all oversized tees",
+      "to": "/shop"
+    },
+    "links": [
+      "acid-wash-tshirts",
+      "anime-oversized-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "acid-wash-tshirts": {
+    "path": "/acid-wash-tshirts",
+    "landing": true,
+    "breadcrumb": "Acid wash & stone wash t-shirts",
+    "title": "Acid Wash & Stone Wash Oversized T-Shirts | Loopstitch",
+    "description": "Acid wash and stone wash oversized t-shirts: each piece is washed individually, so no two are alike. Premium 250 GSM unisex tees, sizes S to XL.",
+    "eyebrow": "Washed by hand · No two alike",
+    "h1": "Acid wash & stone wash t-shirts",
+    "match": [
+      "acid",
+      "stone",
+      "wash",
+      "bleach"
+    ],
+    "intro": [
+      "Acid wash and stone wash t-shirts get their faded, lived-in look from the wash itself, not from a printed pattern. Each Loopstitch washed tee is treated individually, so the marbling, fades and bleach marks land differently on every piece. The one you receive is the only one exactly like it."
+    ],
+    "sections": [
+      {
+        "heading": "Acid wash, stone wash and bleach",
+        "body": [
+          "Acid wash gives high-contrast marbling across a dark base, such as our charcoal acid wash. Stone wash is softer and more even, with a vintage, sun-faded finish. Bleach treatments, like the burgundy bleach tee, add lighter streaks over a rich colour. All three start from the same premium 250 GSM oversized blank, so the fabric keeps its weight and drape after washing."
+        ]
+      },
+      {
+        "heading": "Fit, care and availability",
+        "body": [
+          "The fit is our standard unisex, drop-shoulder cut in sizes S, M, L and XL. Wash washed tees cold and inside out, and skip the bleach and the tumble dryer, to keep the colour where it is.",
+          "Washed tees take longer to make, so batches are small. Once a size sells out it is retired. Orders ship across India with tracking."
+        ]
+      }
+    ],
+    "cta": {
+      "label": "Shop all oversized tees",
+      "to": "/shop"
+    },
+    "links": [
+      "oversized-tshirts",
+      "anime-oversized-tshirts",
+      "custom-tshirt-printing"
+    ]
+  },
+  "custom-tshirt-printing": {
+    "path": "/custom-tshirt-printing",
+    "landing": true,
+    "breadcrumb": "Custom t-shirt printing",
+    "title": "Custom T-Shirt Printing Bangalore & Online India | Loopstitch",
+    "description": "Custom t-shirt printing from a single piece: upload your design and we print it in-house on a premium 250 GSM tee. Bangalore based, delivered across India.",
+    "eyebrow": "From a single piece · Printed in-house",
+    "h1": "Custom t-shirt printing",
+    "match": [],
+    "intro": [
+      "Most custom t-shirt printing asks for a minimum order of twenty or fifty pieces. Loopstitch prints a custom t-shirt from a single piece: one tee, your design, on the same premium 250 GSM oversized blank we use for our own drops. Order one personalised t-shirt online for yourself, or a full run for a college fest, a team or a small brand."
+    ],
+    "sections": [
+      {
+        "heading": "How custom printing works",
+        "body": [
+          "Choose your t-shirt colours and sizes, then upload your artwork: a logo, an illustration, a photo or a rough idea with notes. Every design is checked by a person before it goes to print, and we get in touch if something will not print well. Printing is done in-house, which is why we can take single-piece orders and keep the quality consistent from the first tee to the last."
+        ]
+      },
+      {
+        "heading": "Custom t-shirt printing in Bangalore, delivered across India",
+        "body": [
+          "We are based in Bangalore and take every order online, so you do not need to visit a print shop. Finished tees are packed and shipped with tracking anywhere in India. Larger quantities get volume pricing, shown live as you build your order.",
+          "Sizes run S, M, L and XL in a unisex, drop-shoulder fit."
+        ]
+      }
+    ],
+    "cta": {
+      "label": "Start your custom order",
+      "to": "/customize"
+    },
+    "links": [
+      "anime-oversized-tshirts",
+      "oversized-tshirts",
+      "acid-wash-tshirts"
+    ]
+  }
+}

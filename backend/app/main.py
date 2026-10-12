@@ -1013,14 +1013,20 @@ def _launch_countdown_over(raw: dict) -> bool:
     return datetime.datetime.now(datetime.timezone.utc) >= when
 
 
+def _launch_is_on(raw: dict) -> bool:
+    """Launching-soon page showing to visitors? (auto-open ends it when the countdown runs out)"""
+    launch_on = raw.get("launch_mode", "false") == "true"
+    if launch_on and raw.get("launch_auto_open", "false") == "true" and _launch_countdown_over(raw):
+        launch_on = False
+    return launch_on
+
+
 @app.get("/api/settings/launch", response_model=schemas.PublicLaunchSettings)
 def public_launch_settings(db: Session = Depends(get_db)):
     # When launch_mode is on the storefront shows only the "launching soon" page —
     # unless auto-open is ticked and the countdown has run out, then the store opens by itself
     raw = _get_all_settings(db)
-    launch_on = raw.get("launch_mode", "false") == "true"
-    if launch_on and raw.get("launch_auto_open", "false") == "true" and _launch_countdown_over(raw):
-        launch_on = False
+    launch_on = _launch_is_on(raw)
     return schemas.PublicLaunchSettings(
         launch_mode=launch_on,
         launch_date=raw.get("launch_date", ""),
@@ -2623,7 +2629,8 @@ def admin_delete_instagram_video(video_id: int, db: Session = Depends(get_db), c
 # SITEMAP (served at /sitemap.xml via nginx)
 # ============================================================
 SITE_URL = os.getenv("SITE_URL", "https://loopstitch.online").rstrip("/")
-STATIC_PAGES = [("/", "1.0"), ("/shop", "0.9"), ("/customize", "0.8"), ("/faq", "0.6"), ("/about", "0.5"), ("/terms", "0.3"), ("/privacy", "0.3")]
+STATIC_PAGES = [("/", "1.0"), ("/shop", "0.9"), ("/customize", "0.8"), ("/faq", "0.6"), ("/about", "0.5"), ("/terms", "0.3"), ("/privacy", "0.3")] \
+    + [(info["path"], "0.8") for info in seo.PAGES.values() if info.get("landing")]
 
 
 @app.get("/api/sitemap.xml")
@@ -2710,11 +2717,14 @@ def meta_catalog_feed(db: Session = Depends(get_db)):
         for row in _meta_feed_rows(product):
             writer.writerow(row)
     return Response(content=out.getvalue(), media_type="text/csv; charset=utf-8",
-                    headers={"Cache-Control": "public, max-age=900"})
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 # ============================================================
-# SERVER-RENDERED HEAD for product / journal pages (nginx routes /product/* and /blog/* here)
+# SERVER-RENDERED PAGES (nginx routes every public page here)
+# The app shell is sent with the route's real <head> (title, description, canonical, Open Graph,
+# JSON-LD) and its text already inside #root, so Google, WhatsApp and Instagram see the content
+# without running JavaScript. While the launching-soon page is up, only the <head> is filled in.
 # ============================================================
 def _spa_response(page: Optional[str], status_code: int = 200):
     if page is None:
@@ -2731,7 +2741,7 @@ def render_product(slug: str, db: Session = Depends(get_db)):
     ).first()
     if page is None or product is None:
         return _spa_response(page, 404)
-    return _spa_response(seo.product_page(page, product))
+    return _spa_response(seo.product_page(page, product, with_body=not _launch_is_on(_get_all_settings(db))))
 
 
 @app.get("/api/render/blog/{slug}", include_in_schema=False)
@@ -2740,7 +2750,24 @@ def render_blog(slug: str, db: Session = Depends(get_db)):
     post = db.query(models.BlogPost).filter(models.BlogPost.slug == slug, models.BlogPost.is_published == True).first()  # noqa: E712
     if page is None or post is None:
         return _spa_response(page, 404)
-    return _spa_response(seo.blog_page(page, post))
+    return _spa_response(seo.blog_page(page, post, with_body=not _launch_is_on(_get_all_settings(db))))
+
+
+@app.get("/api/render/page/{key}", include_in_schema=False)
+def render_static_page(key: str, db: Session = Depends(get_db)):
+    """Home, shop, customize, faq, about, blog and the keyword landing pages."""
+    page = seo.load_index()
+    if page is None or key not in seo.PAGES:
+        return _spa_response(page, 404)
+    if _launch_is_on(_get_all_settings(db)):
+        return _spa_response(page)  # visitors only see the launching-soon page: nothing to describe yet
+    products = db.query(models.Product).options(*product_load_options()).filter(
+        models.Product.is_active == True  # noqa: E712
+    ).order_by(models.Product.created_at.desc()).all()
+    posts = []
+    if key == "blog":
+        posts = db.query(models.BlogPost).filter(models.BlogPost.is_published == True).order_by(models.BlogPost.published_at.desc()).all()  # noqa: E712
+    return _spa_response(seo.static_page(page, key, products, posts))
 
 
 # ============================================================
@@ -2791,7 +2818,7 @@ def google_product_feed(db: Session = Depends(get_db)):
         f"<title>{seo.BRAND}</title><link>{seo.SITE_URL}</link><description>Unisex oversized t-shirts</description>\n"
         + "\n".join(items) + "\n</channel></rss>\n"
     )
-    return Response(content=body, media_type="application/xml")
+    return Response(content=body, media_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
 
 
 # ============================================================

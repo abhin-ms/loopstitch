@@ -4,6 +4,11 @@ Disallow: /admin
 Disallow: /app
 Disallow: /checkout
 Disallow: /cart
+Disallow: /order
 Disallow: /orders
+Disallow: /api/admin
+Disallow: /api/auth
+Disallow: /api/orders
+Disallow: /api/customers
 
 Sitemap: https://loopstitch.online/sitemap.xml
