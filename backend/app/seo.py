@@ -194,9 +194,50 @@ def product_page(page: str, product, with_body: bool = True) -> str:
             + (f"<p>Colours: {e(', '.join(c.name for c in colors))}</p>" if colors else "")
             + (f"<p>Sizes: {e(', '.join(sizes))} · Unisex oversized fit</p>" if sizes else "")
         )
-    return inject(page, title=title, description=description, url=url, image=absolute(images[0] if images else ""),
+    page = inject(page, title=title, description=description, url=url, image=absolute(images[0] if images else ""),
                   og_type="product", json_ld=[json_ld, breadcrumbs(("Shop", "/shop"), (product.name, f"/product/{product.slug}"))], body=body,
                   preload=preload_image(first_image, "(min-width: 768px) 50vw, 100vw") if with_body else "")
+    return product_meta_tags(page, product, in_stock)
+
+
+def _first_variant_id(product) -> str:
+    """The Meta feed id (LS<product>-<colour>-<size>) of the variant the page opens on:
+    the first in-stock size of the first colour that has photos, else the first one listed.
+    Same rules and order as the /feeds/meta.csv rows, so the page and the catalogue match."""
+    from .schemas import size_sort_key  # local import: schemas is only needed here
+
+    colors = sorted(product.colors or [], key=lambda c: c.position)
+    variants = [(c.id, c.images or product.images, c.sizes) for c in colors] or [(0, product.images, product.sizes)]
+    ids = []
+    for color_id, imgs, sizes in variants:
+        if not imgs:
+            continue  # the feed skips colours without a photo
+        for size in sorted(sizes or [], key=lambda x: size_sort_key(x.size)):
+            ids.append((f"LS{product.id}-{color_id}-{size.size}", (size.stock or 0) > 0))
+    in_stock = [i for i, ok in ids if ok]
+    return (in_stock or [i for i, _ in ids] or [f"LS{product.id}"])[0]
+
+
+def product_meta_tags(page: str, product, in_stock: bool) -> str:
+    """Open Graph product tags Meta reads to match a page to its catalogue item
+    (Instagram product links, Commerce Manager microdata check). Prices mirror the feed:
+    price = the full price, sale_price = what the customer pays when it's discounted."""
+    on_sale = bool(product.compare_at_price and product.compare_at_price > product.price)
+    tags = {
+        "product:retailer_item_id": _first_variant_id(product),
+        "product:item_group_id": f"LS{product.id}",
+        "product:brand": BRAND,
+        "product:availability": "in stock" if in_stock else "out of stock",
+        "product:condition": "new",
+        "product:price:amount": f"{(product.compare_at_price if on_sale else product.price):.2f}",
+        "product:price:currency": "INR",
+    }
+    if on_sale:
+        tags["product:sale_price:amount"] = f"{product.price:.2f}"
+        tags["product:sale_price:currency"] = "INR"
+    for key, value in tags.items():
+        page = _set_meta(page, "property", key, value)
+    return page
 
 
 def blog_page(page: str, post, with_body: bool = True) -> str:
