@@ -70,12 +70,14 @@ export function CartProvider({ children }) {
 
   const removeItem = (key) => setItems((prev) => prev.filter((i) => i.key !== key))
   const clearCart = () => { setItems([]); setCouponCode('') }
+  // Meta checkout link: the cart becomes exactly what the shopper picked in the Instagram / Facebook shop
+  const replaceItems = (next) => setItems(next)
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items])
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items])
 
   return (
-    <CartContext.Provider value={{ items, addItem, updateQuantity, removeItem, clearCart, subtotal, count, couponCode, setCouponCode }}>
+    <CartContext.Provider value={{ items, addItem, updateQuantity, removeItem, clearCart, replaceItems, subtotal, count, couponCode, setCouponCode }}>
       {children}
     </CartContext.Provider>
   )

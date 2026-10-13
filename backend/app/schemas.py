@@ -790,3 +790,25 @@ class BlogPostOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Meta checkout URL ----------
+class CheckoutLinkItem(BaseModel):
+    """A cart line in the shape the storefront keeps in the browser (CartContext)."""
+    key: str
+    productId: int
+    slug: str
+    name: str
+    price: float
+    colorId: Optional[int] = None
+    color: str = ""
+    colorHex: str = ""
+    image: str = ""
+    size: str
+    quantity: int
+    maxStock: int
+
+
+class CheckoutLinkOut(BaseModel):
+    items: List[CheckoutLinkItem] = []
+    skipped: int = 0

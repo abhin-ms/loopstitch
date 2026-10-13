@@ -10,6 +10,7 @@ import PublicLayout from './components/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import ScrollToTop from './components/ScrollToTop'
 import LaunchGate from './components/LaunchGate'
+import CheckoutLink from './components/CheckoutLink'
 
 const Home = lazy(() => import('./pages/Home'))
 const Shop = lazy(() => import('./pages/Shop'))
@@ -79,7 +80,7 @@ export default function App() {
                 <Route path="/product/:slug" element={<ProductDetail />} />
                 <Route path="/customize" element={<Customize />} />
                 <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/checkout" element={<CheckoutLink><Checkout /></CheckoutLink>} />
                 <Route path="/order/confirm" element={<OrderConfirmation />} />
                 <Route path="/orders" element={<OrderHistory />} />
                 <Route path="/faq" element={<Faq />} />

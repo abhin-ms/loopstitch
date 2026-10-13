@@ -216,3 +216,21 @@ def test_whatsapp_webhook_verification_handshake(client):
     assert ok.status_code == 200 and ok.text == "42"
     bad = client.get("/api/webhooks/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "loopstitch_webhook", "hub.challenge": "42"})
     assert bad.status_code == 403
+
+
+# ---------------------------------------------------------------- Meta checkout URL
+def test_checkout_link_turns_catalogue_ids_into_cart_lines(client, db, product):
+    color = models.ProductColor(product_id=product, name="Black", hex_code="#000000")
+    db.add(color)
+    db.flush()
+    db.add(models.ProductSize(product_id=product, color_id=color.id, size="L", stock=3))
+    db.add(models.ProductSize(product_id=product, color_id=color.id, size="XL", stock=0))
+    db.commit()
+    ids = f"LS{product}-0-M:5,LS{product}-{color.id}-L:1,LS{product}-{color.id}-XL:1,LS999-0-M:1,junk,LS{product}-0-M:x"
+    data = client.get("/api/checkout-link", params={"products": ids}).json()
+    lines = {i["key"]: i for i in data["items"]}
+    assert set(lines) == {f"{product}--M", f"{product}-{color.id}-L"}
+    assert lines[f"{product}--M"]["quantity"] == 2  # capped at what is in stock
+    assert lines[f"{product}-{color.id}-L"]["color"] == "Black"
+    assert data["skipped"] == 4  # sold out, unknown product, two malformed entries
+    assert client.get("/api/checkout-link").json() == {"items": [], "skipped": 0}

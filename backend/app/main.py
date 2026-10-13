@@ -2735,6 +2735,60 @@ def meta_catalog_feed(db: Session = Depends(get_db)):
 
 
 # ============================================================
+# META CHECKOUT URL  (Commerce Manager -> Shops -> checkout on your website)
+# Meta sends the shopper to  /checkout?products=<catalogue id>:<qty>,...&coupon=CODE
+# The ids are the ones in the feed above; this turns them back into cart lines. Prices and
+# totals are still worked out by the normal quote + order code when the shopper pays.
+# ============================================================
+_CATALOG_ID = re.compile(r"^LS(\d+)-(\d+)-(.+)$")
+CHECKOUT_LINK_MAX_LINES = 30
+
+
+@app.get("/api/checkout-link", response_model=schemas.CheckoutLinkOut)
+def checkout_link(products: str = "", db: Session = Depends(get_db)):
+    wanted = {}  # (product_id, color_id, size) -> quantity
+    skipped = 0
+    for entry in products.split(",")[:CHECKOUT_LINK_MAX_LINES]:
+        catalog_id, _, qty = entry.strip().rpartition(":")
+        match = _CATALOG_ID.match(catalog_id.strip())
+        if not match or not qty.strip().isdigit() or int(qty) < 1:
+            skipped += bool(entry.strip())
+            continue
+        key = (int(match.group(1)), int(match.group(2)), match.group(3).strip().upper())
+        wanted[key] = wanted.get(key, 0) + int(qty)
+
+    found = {}
+    if wanted:
+        rows = db.query(models.Product).options(*product_load_options()).filter(
+            models.Product.id.in_({key[0] for key in wanted}), models.Product.is_active == True  # noqa: E712
+        ).all()
+        found = {p.id: p for p in rows}
+
+    items = []
+    for (product_id, color_id, size), quantity in wanted.items():
+        product = found.get(product_id)
+        color = next((c for c in product.colors if c.id == color_id), None) if product and color_id else None
+        sizes = color.sizes if color else (product.sizes if product and not color_id else [])
+        row = next((s for s in sizes if s.size.upper() == size and (color or s.color_id is None)), None)
+        stock = (row.stock or 0) if row else 0
+        if stock < 1:
+            skipped += 1  # unknown, removed or sold out since Meta last read the feed
+            continue
+        size = row.size
+        images = sorted((color.images if color and color.images else product.images), key=lambda i: (i.position, i.id))
+        items.append({
+            "key": f"{product.id}-{color.id if color else ''}-{size}",
+            "productId": product.id, "slug": product.slug, "name": product.name, "price": product.price,
+            "colorId": color.id if color else None,
+            "color": color.name if color else (product.colorway or ""),
+            "colorHex": color.hex_code if color else "",
+            "image": images[0].url if images else "",
+            "size": size, "quantity": min(quantity, stock, 50), "maxStock": stock,
+        })
+    return {"items": items, "skipped": skipped}
+
+
+# ============================================================
 # SERVER-RENDERED PAGES (nginx routes every public page here)
 # The app shell is sent with the route's real <head> (title, description, canonical, Open Graph,
 # JSON-LD) and its text already inside #root, so Google, WhatsApp and Instagram see the content
