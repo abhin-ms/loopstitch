@@ -378,6 +378,32 @@ class SiteVisit(Base):
     page_views = Column(Integer, default=0, nullable=False)   # every page opened
 
 
+class VisitBreakdown(Base):
+    """Daily visits split by device and by where they came from (Admin → Visitors). Anonymous totals."""
+    __tablename__ = "visit_breakdown"
+
+    id = Column(Integer, primary_key=True)
+    day = Column(Date, nullable=False, index=True)  # India date
+    kind = Column(String(10), nullable=False)       # "device" | "source"
+    label = Column(String(40), nullable=False)      # Mobile, Instagram, Direct, ...
+    visits = Column(Integer, default=0, nullable=False)
+
+    __table_args__ = (UniqueConstraint("day", "kind", "label", name="uq_visit_breakdown"),)
+
+
+class LiveVisitor(Base):
+    """Who is on the site right now: one row per open browser tab session, refreshed every
+    half minute while the tab is open. The id is a random number made in the browser; rows
+    older than a day are deleted."""
+    __tablename__ = "live_visitors"
+
+    sid = Column(String(40), primary_key=True)
+    last_seen = Column(DateTime, nullable=False, index=True)
+    device = Column(String(10), default="")
+    source = Column(String(40), default="")
+    path = Column(String(200), default="")
+
+
 class Review(Base):
     """Customer product review. Hidden from the storefront until an admin approves it."""
     __tablename__ = "reviews"

@@ -7,16 +7,40 @@ import { configure as configureAnalytics, pageView } from '../utils/pixel'
 
 const LaunchingSoon = lazy(() => import('../pages/LaunchingSoon'))
 const VISIT_KEY = 'loopstitch_visit_counted'
+const ORIGIN_KEY = 'loopstitch_visit_origin'
+const HEARTBEAT_MS = 30000
 
-// Anonymous visit counter for Admin → Dashboard: one "visit" per browsing session,
-// one "page view" per page. Admins browsing their own store are not counted.
-function trackPageView() {
-  let newVisit = false
+// Where this visit came from (the site that linked here, ?utm_source, an ad click id) and a
+// random id for this tab. Worked out once on arrival and kept for the tab's lifetime, so
+// Admin → Visitors can show "from Instagram, on mobile, online now". Nothing personal.
+function visitOrigin() {
   try {
-    newVisit = !sessionStorage.getItem(VISIT_KEY)
-    sessionStorage.setItem(VISIT_KEY, '1')
-  } catch { /* storage blocked: still count the page view */ }
-  client.post('/api/track', { new_visit: newVisit }).catch(() => {})
+    const saved = sessionStorage.getItem(ORIGIN_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch { /* storage blocked */ }
+  const query = new URLSearchParams(window.location.search)
+  const origin = {
+    sid: (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`).slice(0, 40),
+    referrer: (document.referrer || '').slice(0, 500),
+    utm_source: (query.get('utm_source') || '').slice(0, 80),
+    click_id: query.has('fbclid') ? 'fbclid' : query.has('gclid') ? 'gclid' : '',
+  }
+  try { sessionStorage.setItem(ORIGIN_KEY, JSON.stringify(origin)) } catch { /* storage blocked */ }
+  return origin
+}
+
+// Anonymous visit counter for Admin → Dashboard / Visitors: one "visit" per browsing session,
+// one "page view" per page. Admins browsing their own store are not counted.
+function trackPageView(heartbeat = false) {
+  let newVisit = false
+  const origin = visitOrigin()
+  if (!heartbeat) {
+    try {
+      newVisit = !sessionStorage.getItem(VISIT_KEY)
+      sessionStorage.setItem(VISIT_KEY, '1')
+    } catch { /* storage blocked: still count the page view */ }
+  }
+  client.post('/api/track', { ...origin, new_visit: newVisit, heartbeat, path: window.location.pathname.slice(0, 300) }).catch(() => {})
 }
 
 // Wraps the storefront + mobile app. While "launch mode" is on in admin
@@ -34,6 +58,15 @@ export default function LaunchGate() {
     trackPageView()
     pageView()  // Meta Pixel
   }, [pathname, adminLoading, isAuthenticated])
+
+  // "still here" ping while the tab is open and visible, for the live visitor count
+  useEffect(() => {
+    if (adminLoading || isAuthenticated) return undefined
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') trackPageView(true)
+    }, HEARTBEAT_MS)
+    return () => clearInterval(timer)
+  }, [adminLoading, isAuthenticated])
 
   useEffect(() => {
     client

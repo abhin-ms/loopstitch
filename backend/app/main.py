@@ -34,6 +34,7 @@ from . import launch_alerts
 from . import mailer
 from . import meta_capi
 from . import imaging
+from . import visits as visits_helper
 from . import customer_auth
 from . import seo
 from . import ratelimit
@@ -1772,28 +1773,104 @@ def like_product(slug: str, payload: schemas.LikeIn, request: Request, db: Sessi
     return {"likes": product.likes}
 
 
+LIVE_WINDOW_SECONDS = 90  # tabs ping every 30s; two missed pings = gone
+
+
+def _bump(db: Session, model, where: dict, counters: dict) -> None:
+    """Atomic += on a daily counter row; the first hit of the day creates it
+    (retry once if another worker created it at the same moment)."""
+    cols = {getattr(model, name): getattr(model, name) + n for name, n in counters.items() if n}
+    if not cols:
+        return
+    for _ in range(2):
+        if db.query(model).filter_by(**where).update(cols, synchronize_session=False):
+            db.commit()
+            return
+        try:
+            db.add(model(**where, **counters))
+            db.commit()
+            return
+        except IntegrityError:
+            db.rollback()
+
+
+def _seen_live(db: Session, sid: str, device: str, source: str, path: str) -> None:
+    now = models._utcnow()
+    seen = {"last_seen": now, "path": path[:200]}
+    if not db.query(models.LiveVisitor).filter_by(sid=sid).update(seen, synchronize_session=False):
+        try:
+            db.add(models.LiveVisitor(sid=sid, device=device, source=source, **seen))
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+        # a new tab is also the moment to clear out yesterday's rows
+        db.query(models.LiveVisitor).filter(
+            models.LiveVisitor.last_seen < now - datetime.timedelta(days=1)
+        ).delete(synchronize_session=False)
+    db.commit()
+
+
 @app.post("/api/track", status_code=204)
 def track_visit(payload: schemas.TrackIn, request: Request, db: Session = Depends(get_db)):
     """Storefront page-view ping: bumps today's anonymous totals. Bots are ignored."""
-    if _BOT_UA.search(request.headers.get("user-agent", "")):
+    user_agent = request.headers.get("user-agent", "")
+    if _BOT_UA.search(user_agent):
         return Response(status_code=204)
     ratelimit.limit(request, "track", max_hits=600, window_seconds=60 * 60)
     today = _today_ist()
-    bump = {models.SiteVisit.page_views: models.SiteVisit.page_views + 1}
-    if payload.new_visit:
-        bump[models.SiteVisit.visits] = models.SiteVisit.visits + 1
-    # atomic +1; the first ping of the day creates the row (retry if another worker beat us to it)
-    for _ in range(2):
-        if db.query(models.SiteVisit).filter(models.SiteVisit.day == today).update(bump, synchronize_session=False):
-            db.commit()
-            break
-        try:
-            db.add(models.SiteVisit(day=today, visits=1 if payload.new_visit else 0, page_views=1))
-            db.commit()
-            break
-        except IntegrityError:
-            db.rollback()
+    device = visits_helper.device(user_agent)
+    source = visits_helper.source(user_agent, payload.referrer, payload.utm_source, payload.click_id)
+    if not payload.heartbeat:
+        _bump(db, models.SiteVisit, {"day": today}, {"visits": int(payload.new_visit), "page_views": 1})
+    if payload.new_visit and not payload.heartbeat:
+        _bump(db, models.VisitBreakdown, {"day": today, "kind": "device", "label": device}, {"visits": 1})
+        _bump(db, models.VisitBreakdown, {"day": today, "kind": "source", "label": source}, {"visits": 1})
+    if re.fullmatch(r"[A-Za-z0-9-]{8,40}", payload.sid):
+        _seen_live(db, payload.sid, device, source, payload.path)
     return Response(status_code=204)
+
+
+@app.get("/api/admin/visitors")
+def admin_visitors(days: int = 7, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Admin → Visitors: who is on the site now, and visits by device and by source.
+    days=0 means all time."""
+    today = _today_ist()
+    since = today - datetime.timedelta(days=days - 1) if days > 0 else None
+    now = models._utcnow()
+
+    live_rows = db.query(models.LiveVisitor).filter(
+        models.LiveVisitor.last_seen >= now - datetime.timedelta(seconds=LIVE_WINDOW_SECONDS)
+    ).order_by(models.LiveVisitor.last_seen.desc()).all()
+
+    daily_q = db.query(models.SiteVisit)
+    split_q = db.query(models.VisitBreakdown.kind, models.VisitBreakdown.label, func.sum(models.VisitBreakdown.visits))
+    if since:
+        daily_q = daily_q.filter(models.SiteVisit.day >= since)
+        split_q = split_q.filter(models.VisitBreakdown.day >= since)
+    daily = daily_q.order_by(models.SiteVisit.day.desc()).all()
+    split = {"device": [], "source": []}
+    for kind, label, visits in split_q.group_by(models.VisitBreakdown.kind, models.VisitBreakdown.label).all():
+        split.setdefault(kind, []).append({"label": label, "visits": int(visits or 0)})
+    for rows in split.values():
+        rows.sort(key=lambda r: -r["visits"])
+    first_split_day = db.query(func.min(models.VisitBreakdown.day)).scalar()
+    return {
+        "live": {
+            "count": len(live_rows),
+            "visitors": [
+                {"device": v.device, "source": v.source, "path": v.path,
+                 "seconds_ago": max(0, int((now - v.last_seen).total_seconds()))}
+                for v in live_rows[:50]
+            ],
+        },
+        "visits": sum(d.visits for d in daily),
+        "page_views": sum(d.page_views for d in daily),
+        "devices": split["device"],
+        "sources": split["source"],
+        "daily": [{"day": d.day.isoformat(), "visits": d.visits, "page_views": d.page_views} for d in daily[:60]],
+        # device / source counting started later than the plain visit counter
+        "breakdown_since": first_split_day.isoformat() if first_split_day else None,
+    }
 
 
 @app.get("/api/admin/stats")

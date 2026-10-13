@@ -234,3 +234,38 @@ def test_checkout_link_turns_catalogue_ids_into_cart_lines(client, db, product):
     assert lines[f"{product}-{color.id}-L"]["color"] == "Black"
     assert data["skipped"] == 4  # sold out, unknown product, two malformed entries
     assert client.get("/api/checkout-link").json() == {"items": [], "skipped": 0}
+
+
+# ---------------------------------------------------------------- visitor details
+IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"
+CHROME_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36"
+
+
+def test_visits_are_split_by_device_and_source_and_counted_live(client, admin_token):
+    def ping(ua, **body):
+        assert client.post("/api/track", json=body, headers={"user-agent": ua}).status_code == 204
+
+    ping(IPHONE + " Instagram 300.0", new_visit=True, sid="tab-aaaaaaa1", path="/shop")
+    ping(IPHONE, new_visit=True, sid="tab-aaaaaaa2", path="/", referrer="https://l.facebook.com/l.php", click_id="fbclid")
+    ping(CHROME_PC, new_visit=True, sid="tab-aaaaaaa3", path="/", referrer="https://www.google.com/")
+    ping(CHROME_PC, sid="tab-aaaaaaa3", path="/product/tee")           # second page, same visit
+    ping(CHROME_PC, sid="tab-aaaaaaa3", path="/product/tee", heartbeat=True)  # still here: not a page view
+    ping("Googlebot/2.1", new_visit=True, sid="tab-aaaaaaa4")           # bots are ignored
+
+    data = client.get("/api/admin/visitors", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    assert (data["visits"], data["page_views"]) == (3, 4)
+    assert {d["label"]: d["visits"] for d in data["devices"]} == {"Mobile": 2, "Computer": 1}
+    assert {s["label"]: s["visits"] for s in data["sources"]} == {"Instagram": 1, "Facebook": 1, "Google": 1}
+    assert data["live"]["count"] == 3
+    assert {v["path"] for v in data["live"]["visitors"]} == {"/shop", "/", "/product/tee"}
+    assert client.get("/api/admin/visitors").status_code in (401, 403)
+
+
+def test_visit_source_rules():
+    from app import visits
+    assert visits.source() == "Direct"
+    assert visits.source(utm_source="whatsapp") == "WhatsApp"
+    assert visits.source(click_id="fbclid") == "Facebook / Instagram ad"
+    assert visits.source(referrer="https://loopstitch.online/shop") == "Direct"
+    assert visits.source(referrer="https://someblog.example/post") == "Other website"
+    assert visits.device("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)") == "Tablet"

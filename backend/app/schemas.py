@@ -671,6 +671,12 @@ class LikeIn(BaseModel):
 
 class TrackIn(BaseModel):
     new_visit: bool = False  # first page of a browsing session
+    heartbeat: bool = False  # "still here" ping from an open tab: not a page view
+    sid: str = Field(default="", max_length=40)        # random per-tab id, for the live count
+    path: str = Field(default="", max_length=300)
+    referrer: str = Field(default="", max_length=500)  # the site the visit came from
+    utm_source: str = Field(default="", max_length=80)
+    click_id: Literal["", "fbclid", "gclid"] = ""      # which ad click id the link carried
 
 
 class LaunchAlertTest(BaseModel):
