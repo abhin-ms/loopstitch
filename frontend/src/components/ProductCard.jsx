@@ -64,7 +64,6 @@ export default function ProductCard({ product, index = 0 }) {
               <path d="M12 21s-7.5-4.6-9.5-9.2C1 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7h2C14 6.1 15.600 5 17.600 5 21 5 23 8.400 21.500 11.800 19.500 16.400 12 21 12 21z" />
             </svg>
           </button>
-          <div className="absolute inset-0 screentone-red screentone opacity-0 group-hover:opacity-[0.08] transition-opacity duration-500" />
 
           {product.is_featured && !isSoldOut && (
             <span className="sticker absolute top-3 left-3 bg-acid text-ink text-[10px] font-mono font-bold px-2 py-1 uppercase tracking-wider">
