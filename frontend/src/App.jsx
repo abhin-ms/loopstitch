@@ -48,6 +48,8 @@ const AdminInstagram = lazy(() => import('./pages/admin/AdminInstagram'))
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'))
 const AdminSubscribers = lazy(() => import('./pages/admin/AdminSubscribers'))
 const AdminVisitors = lazy(() => import('./pages/admin/AdminVisitors'))
+const AdminCarts = lazy(() => import('./pages/admin/AdminCarts'))
+const AdminAccounts = lazy(() => import('./pages/admin/AdminAccounts'))
 
 const MobileLayout = lazy(() => import('./mobile/MobileLayout'))
 const MobileHome = lazy(() => import('./mobile/pages/Home'))
@@ -121,6 +123,8 @@ export default function App() {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="visitors" element={<AdminVisitors />} />
+                <Route path="carts" element={<AdminCarts />} />
+                <Route path="accounts" element={<AdminAccounts />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="products/new" element={<AdminProductForm />} />
                 <Route path="products/:id" element={<AdminProductForm />} />

@@ -8,6 +8,8 @@ import useNoIndex from '../hooks/useNoIndex'
 const LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard' },
   { to: '/admin/visitors', label: 'Visitors' },
+  { to: '/admin/carts', label: 'Carts' },
+  { to: '/admin/accounts', label: 'Accounts' },
   { to: '/admin/products', label: 'Products' },
   { to: '/admin/custom-tshirt', label: 'Custom T-Shirt' },
   { to: '/admin/custom-orders', label: 'Custom Orders' },

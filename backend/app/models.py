@@ -404,6 +404,40 @@ class LiveVisitor(Base):
     path = Column(String(200), default="")
 
 
+class CartLog(Base):
+    """Admin → Carts: what shoppers put in their cart, one row per cart "life" (from the first
+    item until it is emptied or ordered). Kept for 90 days."""
+    __tablename__ = "cart_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cart_id = Column(String(40), nullable=False, index=True)  # random id kept in the shopper's browser
+    status = Column(String(10), nullable=False, default="active", index=True)  # active | cleared | ordered
+    ip = Column(String(64), default="")
+    device = Column(String(10), default="")
+    source = Column(String(40), default="")
+    customer_phone = Column(String(30), default="")  # when the shopper is logged in
+    items = Column(Text, default="[]")               # JSON list of cart lines
+    item_count = Column(Integer, default=0)
+    value = Column(Float, default=0)
+    peak_count = Column(Integer, default=0)          # most items it ever held (what a cleared cart had)
+    created_at = Column(DateTime, default=_utcnow, index=True)
+    updated_at = Column(DateTime, default=_utcnow, index=True)
+
+
+class LoginEvent(Base):
+    """Admin → Accounts: every customer (OTP) and admin login attempt. Kept for 90 days."""
+    __tablename__ = "login_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    kind = Column(String(10), nullable=False)      # customer | admin
+    who = Column(String(150), default="")          # phone number or admin username
+    ok = Column(Boolean, default=True, nullable=False)
+    detail = Column(String(60), default="")        # "Logged in", "Wrong code", ...
+    ip = Column(String(64), default="")
+    device = Column(String(10), default="")
+    created_at = Column(DateTime, default=_utcnow, index=True)
+
+
 class Review(Base):
     """Customer product review. Hidden from the storefront until an admin approves it."""
     __tablename__ = "reviews"

@@ -1,9 +1,44 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useMemo } from 'react'
 import { addToCart } from '../utils/pixel'
+import client from '../api/client'
+import { useAdminAuth } from './AdminAuthContext'
 
 const CartContext = createContext(null)
 const STORAGE_KEY = 'loopstitch_cart'
 const COUPON_KEY = 'loopstitch_coupon'
+const CART_ID_KEY = 'loopstitch_cart_id'
+const ORIGIN_KEY = 'loopstitch_visit_origin'  // set by LaunchGate: where this visit came from
+
+// Random id for this browser's cart, so Admin → Carts can follow one cart over time
+function cartId() {
+  try {
+    let id = localStorage.getItem(CART_ID_KEY)
+    if (!id) {
+      id = (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`).slice(0, 40)
+      localStorage.setItem(CART_ID_KEY, id)
+    }
+    return id
+  } catch { return '' }
+}
+
+// Tell the server what is in the cart now (Admin → Carts). Fire and forget.
+function reportCart(items, reason = '') {
+  const id = cartId()
+  if (!id) return
+  let origin = {}
+  try { origin = JSON.parse(sessionStorage.getItem(ORIGIN_KEY) || '{}') } catch { /* storage blocked */ }
+  client.post('/api/cart-activity', {
+    cart_id: id,
+    reason,
+    referrer: origin.referrer || '',
+    utm_source: origin.utm_source || '',
+    click_id: origin.click_id || '',
+    items: items.slice(0, 50).map((i) => ({
+      productId: i.productId, slug: i.slug || '', name: i.name || '', size: String(i.size || ''),
+      color: i.color || '', image: i.image || '', quantity: i.quantity, price: i.price,
+    })),
+  }).catch(() => {})
+}
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
@@ -18,6 +53,20 @@ export function CartProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
   }, [items])
+
+  // Cart report for the admin: sent shortly after each change (not on page load, and never for
+  // an admin testing the shop). An empty cart right after checkout counts as "ordered".
+  const { isAuthenticated: isAdmin } = useAdminAuth()
+  const firstRender = useRef(true)
+  const clearReason = useRef('')
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return undefined }
+    if (isAdmin) return undefined
+    const reason = clearReason.current
+    clearReason.current = ''
+    const timer = setTimeout(() => reportCart(items, reason), 800)
+    return () => clearTimeout(timer)
+  }, [items])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Coupon code travels with the cart (announcement -> cart -> checkout) and survives a refresh.
   // Whether it actually applies is always decided by the server quote.
@@ -69,7 +118,8 @@ export function CartProvider({ children }) {
   }
 
   const removeItem = (key) => setItems((prev) => prev.filter((i) => i.key !== key))
-  const clearCart = () => { setItems([]); setCouponCode('') }
+  // only called after an order is placed
+  const clearCart = () => { clearReason.current = 'ordered'; setItems([]); setCouponCode('') }
   // Meta checkout link: the cart becomes exactly what the shopper picked in the Instagram / Facebook shop
   const replaceItems = (next) => setItems(next)
 

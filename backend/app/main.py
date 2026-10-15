@@ -1,6 +1,7 @@
 import csv
 import hmac
 import io
+import json
 import os
 import re
 import secrets
@@ -148,12 +149,33 @@ def health():
 # ============================================================
 # ADMIN AUTH  (hidden route — no signup endpoint exists at all)
 # ============================================================
+REPORT_KEEP_DAYS = 90  # cart and login logs older than this are deleted
+
+
+def _log_login(db: Session, request: Request, kind: str, who: str, ok: bool, detail: str) -> None:
+    """Admin → Accounts login log. Never lets a logging problem break the login itself."""
+    try:
+        db.add(models.LoginEvent(
+            kind=kind, who=(who or "")[:150], ok=ok, detail=detail, ip=ratelimit.client_ip(request)[:64],
+            device=visits_helper.device(request.headers.get("user-agent", "")),
+        ))
+        db.query(models.LoginEvent).filter(
+            models.LoginEvent.created_at < _utcnow() - datetime.timedelta(days=REPORT_KEEP_DAYS)
+        ).delete(synchronize_session=False)
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.warning("login log failed: %s", exc)
+
+
 @app.post("/api/admin/login", response_model=schemas.TokenResponse)
 def admin_login(payload: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
     ratelimit.limit(request, "admin_login", max_hits=10, window_seconds=15 * 60)
     admin = db.query(models.Admin).filter(models.Admin.username == payload.username).first()
     if not admin or not auth.verify_password(payload.password, admin.hashed_password):
+        _log_login(db, request, "admin", payload.username, False, "Wrong username or password")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    _log_login(db, request, "admin", admin.username, True, "Logged in")
     token = auth.create_access_token({"sub": admin.username, "role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
 
@@ -231,11 +253,13 @@ def verify_otp(payload: schemas.VerifyOTPRequest, request: Request, db: Session 
     ).order_by(models.OTP.created_at.desc()).with_for_update().first()
 
     if not otp_record:
+        _log_login(db, request, "customer", phone, False, "No code requested")
         raise HTTPException(status_code=400, detail="Invalid OTP code")
 
     if otp_record.expires_at < _utcnow():
         otp_record.used = True
         db.commit()
+        _log_login(db, request, "customer", phone, False, "Code expired")
         raise HTTPException(status_code=400, detail="OTP has expired")
 
     if not secrets.compare_digest(otp_record.otp_code, otp_code):
@@ -243,8 +267,10 @@ def verify_otp(payload: schemas.VerifyOTPRequest, request: Request, db: Session 
         if otp_record.attempts >= customer_auth.OTP_MAX_ATTEMPTS:
             otp_record.used = True
             db.commit()
+            _log_login(db, request, "customer", phone, False, "Too many wrong codes")
             raise HTTPException(status_code=400, detail="Too many wrong attempts. Please request a new OTP.")
         db.commit()
+        _log_login(db, request, "customer", phone, False, "Wrong code")
         raise HTTPException(status_code=400, detail="Invalid OTP code")
 
     otp_record.used = True
@@ -252,6 +278,7 @@ def verify_otp(payload: schemas.VerifyOTPRequest, request: Request, db: Session 
 
     # Create or find customer
     customer = customer_auth.create_or_get_customer(db, phone)
+    _log_login(db, request, "customer", phone, True, "Logged in")
 
     token = customer_auth.create_customer_token(phone)
     return schemas.CustomerTokenResponse(
@@ -1870,6 +1897,110 @@ def admin_visitors(days: int = 7, db: Session = Depends(get_db), current: models
         "daily": [{"day": d.day.isoformat(), "visits": d.visits, "page_views": d.page_views} for d in daily[:60]],
         # device / source counting started later than the plain visit counter
         "breakdown_since": first_split_day.isoformat() if first_split_day else None,
+    }
+
+
+@app.post("/api/cart-activity", status_code=204)
+def cart_activity(
+    payload: schemas.CartActivityIn, request: Request, db: Session = Depends(get_db),
+    customer: Optional[models.Customer] = Depends(customer_auth.get_current_customer),
+):
+    """The shopper's cart changed: keep Admin → Carts up to date. An empty cart closes the
+    current row as "ordered" (right after checkout) or "cleared" (they removed everything)."""
+    user_agent = request.headers.get("user-agent", "")
+    if _BOT_UA.search(user_agent):
+        return Response(status_code=204)
+    ratelimit.limit(request, "cart_activity", max_hits=300, window_seconds=60 * 60)
+    now = _utcnow()
+    row = db.query(models.CartLog).filter(
+        models.CartLog.cart_id == payload.cart_id, models.CartLog.status == "active"
+    ).order_by(models.CartLog.id.desc()).first()
+    lines = [line for line in payload.items if line.quantity > 0]
+
+    if not lines:
+        if row:
+            row.status = "ordered" if payload.reason == "ordered" else "cleared"
+            row.updated_at = now
+            if customer:
+                row.customer_phone = customer.phone
+            db.commit()
+        return Response(status_code=204)
+
+    if row is None:
+        row = models.CartLog(
+            cart_id=payload.cart_id, created_at=now, device=visits_helper.device(user_agent),
+            source=visits_helper.source(user_agent, payload.referrer, payload.utm_source, payload.click_id),
+        )
+        db.add(row)
+        db.query(models.CartLog).filter(
+            models.CartLog.updated_at < now - datetime.timedelta(days=REPORT_KEEP_DAYS)
+        ).delete(synchronize_session=False)
+    count = sum(line.quantity for line in lines)
+    row.items = json.dumps([line.model_dump() for line in lines])
+    row.item_count = count
+    row.peak_count = max(row.peak_count or 0, count)
+    row.value = round(sum(line.price * line.quantity for line in lines), 2)
+    row.ip = ratelimit.client_ip(request)[:64]
+    row.updated_at = now
+    if customer:
+        row.customer_phone = customer.phone
+    db.commit()
+    return Response(status_code=204)
+
+
+def _customer_names(db: Session, phones) -> dict:
+    phones = {p for p in phones if p}
+    if not phones:
+        return {}
+    return {c.phone: c.name for c in db.query(models.Customer).filter(models.Customer.phone.in_(phones)).all()}
+
+
+@app.get("/api/admin/carts")
+def admin_carts(status: str = "", days: int = 30, db: Session = Depends(get_db),
+                current: models.Admin = Depends(auth.get_current_admin)):
+    """Admin → Carts: every cart shoppers filled in the period, newest activity first."""
+    query = db.query(models.CartLog)
+    if days > 0:
+        query = query.filter(models.CartLog.updated_at >= _utcnow() - datetime.timedelta(days=days))
+    counts = {"active": 0, "cleared": 0, "ordered": 0}
+    for state, n in query.with_entities(models.CartLog.status, func.count()).group_by(models.CartLog.status).all():
+        counts[state] = n
+    if status in counts:
+        query = query.filter(models.CartLog.status == status)
+    rows = query.order_by(models.CartLog.updated_at.desc()).limit(500).all()
+    names = _customer_names(db, [r.customer_phone for r in rows])
+    return {
+        "counts": counts,
+        "carts": [{
+            "id": r.id, "status": r.status, "ip": r.ip, "device": r.device, "source": r.source,
+            "customer_phone": r.customer_phone, "customer_name": names.get(r.customer_phone, ""),
+            "items": json.loads(r.items or "[]"), "item_count": r.item_count, "peak_count": r.peak_count,
+            "value": r.value, "created_at": r.created_at.isoformat() + "Z", "updated_at": r.updated_at.isoformat() + "Z",
+        } for r in rows],
+    }
+
+
+@app.get("/api/admin/accounts")
+def admin_accounts(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Admin → Accounts: customer accounts, and the log of customer and admin logins."""
+    order_counts = dict(db.query(models.Order.customer_id, func.count()).filter(
+        models.Order.customer_id.isnot(None)).group_by(models.Order.customer_id).all())
+    last_login = dict(db.query(models.LoginEvent.who, func.max(models.LoginEvent.created_at)).filter(
+        models.LoginEvent.kind == "customer", models.LoginEvent.ok == True  # noqa: E712
+    ).group_by(models.LoginEvent.who).all())
+    customers = db.query(models.Customer).order_by(models.Customer.created_at.desc()).limit(1000).all()
+    events = db.query(models.LoginEvent).order_by(models.LoginEvent.created_at.desc(), models.LoginEvent.id.desc()).limit(300).all()
+    names = _customer_names(db, [e.who for e in events if e.kind == "customer"])
+    iso = lambda d: d.isoformat() + "Z" if d else None  # noqa: E731
+    return {
+        "customers": [{
+            "id": c.id, "name": c.name, "phone": c.phone, "email": c.email, "joined": iso(c.created_at),
+            "orders": order_counts.get(c.id, 0), "last_login": iso(last_login.get(c.phone)),
+        } for c in customers],
+        "logins": [{
+            "id": e.id, "kind": e.kind, "who": e.who, "name": names.get(e.who, "") if e.kind == "customer" else "",
+            "ok": e.ok, "detail": e.detail, "ip": e.ip, "device": e.device, "at": iso(e.created_at),
+        } for e in events],
     }
 
 

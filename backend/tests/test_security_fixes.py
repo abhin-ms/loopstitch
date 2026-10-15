@@ -269,3 +269,50 @@ def test_visit_source_rules():
     assert visits.source(referrer="https://loopstitch.online/shop") == "Direct"
     assert visits.source(referrer="https://someblog.example/post") == "Other website"
     assert visits.device("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)") == "Tablet"
+
+
+# ---------------------------------------------------------------- cart report + login log
+def test_cart_report_tracks_active_cleared_and_ordered_carts(client, admin_token):
+    admin = {"Authorization": f"Bearer {admin_token}"}
+    line = {"productId": 1, "slug": "tee", "name": "Tee", "size": "M", "quantity": 2, "price": 999}
+
+    def cart(cart_id, items, reason=""):
+        r = client.post("/api/cart-activity", json={"cart_id": cart_id, "items": items, "reason": reason},
+                        headers={"user-agent": IPHONE, "cf-connecting-ip": "203.0.113.7"})
+        assert r.status_code == 204
+
+    cart("cart-aaaaaaa1", [line])
+    cart("cart-aaaaaaa1", [{**line, "quantity": 3}])   # same cart, more items: still one row
+    cart("cart-aaaaaaa2", [line]); cart("cart-aaaaaaa2", [])              # removed everything
+    cart("cart-aaaaaaa3", [line]); cart("cart-aaaaaaa3", [], "ordered")   # emptied by checkout
+    cart("cart-aaaaaaa3", [line])                                         # shopping again: a new row
+
+    data = client.get("/api/admin/carts", params={"days": 0}, headers=admin).json()
+    assert data["counts"] == {"active": 2, "cleared": 1, "ordered": 1}
+    first = next(c for c in data["carts"] if c["item_count"] == 3)
+    assert (first["ip"], first["device"], first["value"]) == ("203.0.113.7", "Mobile", 2997)
+    assert first["items"][0]["name"] == "Tee"
+    cleared = client.get("/api/admin/carts", params={"status": "cleared", "days": 0}, headers=admin).json()["carts"]
+    assert len(cleared) == 1 and cleared[0]["peak_count"] == 2
+    assert client.get("/api/admin/carts").status_code in (401, 403)
+
+
+def test_logins_are_logged_for_admins_and_customers(client, db, admin_token):
+    assert client.post("/api/admin/login", json={"username": "boss", "password": "nope"}).status_code == 401
+    assert client.post("/api/admin/login", json={"username": "boss", "password": "pw"}).status_code == 200
+    db.add(models.OTP(phone="9000000009", otp_code="123456",
+                      expires_at=datetime.datetime.utcnow() + datetime.timedelta(minutes=5)))
+    db.commit()
+    assert client.post("/api/auth/verify-otp", json={"phone": "9000000009", "otp": "000000"}).status_code == 400
+    assert client.post("/api/auth/verify-otp", json={"phone": "9000000009", "otp": "123456"}).status_code == 200
+
+    data = client.get("/api/admin/accounts", headers={"Authorization": f"Bearer {admin_token}"}).json()
+    log = [(e["kind"], e["who"], e["ok"], e["detail"]) for e in reversed(data["logins"])]
+    assert log == [
+        ("admin", "boss", False, "Wrong username or password"),
+        ("admin", "boss", True, "Logged in"),
+        ("customer", "9000000009", False, "Wrong code"),
+        ("customer", "9000000009", True, "Logged in"),
+    ]
+    assert [c["phone"] for c in data["customers"]] == ["9000000009"]
+    assert data["customers"][0]["last_login"]

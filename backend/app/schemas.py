@@ -818,3 +818,24 @@ class CheckoutLinkItem(BaseModel):
 class CheckoutLinkOut(BaseModel):
     items: List[CheckoutLinkItem] = []
     skipped: int = 0
+
+
+# ---------- Cart report ----------
+class CartLine(BaseModel):
+    productId: Optional[int] = None
+    slug: str = Field(default="", max_length=200)
+    name: str = Field(default="", max_length=200)
+    size: str = Field(default="", max_length=20)
+    color: str = Field(default="", max_length=100)
+    image: str = Field(default="", max_length=500)
+    quantity: int = Field(default=1, ge=0, le=999)
+    price: float = Field(default=0, ge=0)
+
+
+class CartActivityIn(BaseModel):
+    cart_id: str = Field(min_length=8, max_length=40, pattern=r"^[A-Za-z0-9-]+$")
+    items: List[CartLine] = Field(default_factory=list, max_length=50)
+    reason: Literal["", "ordered"] = ""  # an empty cart after an order is a sale, not "cleared"
+    referrer: str = Field(default="", max_length=500)
+    utm_source: str = Field(default="", max_length=80)
+    click_id: Literal["", "fbclid", "gclid"] = ""
