@@ -7,6 +7,7 @@ import SewingCursor from './SewingCursor'
 import TouchFeedback from './TouchFeedback'
 import AnnouncementBar from './AnnouncementBar'
 import InstallAppBanner from './InstallAppBanner'
+import WhatsAppButton from './WhatsAppButton'
 
 const SITE = 'https://loopstitch.online'
 const PRIVATE_PATHS = ['/cart', '/checkout', '/orders', '/order/confirm']
@@ -49,6 +50,7 @@ export default function PublicLayout() {
         </Suspense>
       </main>
       <Footer />
+      <WhatsAppButton />
     </div>
   )
 }
