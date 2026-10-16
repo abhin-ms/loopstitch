@@ -2657,6 +2657,34 @@ def _review_copies(db: Session, review: models.Review) -> list:
     return db.query(models.Review).filter(models.Review.order_id == review.order_id).all()
 
 
+@app.post("/api/admin/review-requests/send")
+def admin_send_review_request(payload: schemas.ReviewRequestSend, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Send the WhatsApp review form now (no waiting for delivery + delay), e.g. to test it on your
+    own number: {"phone": "916238860673"} uses that customer's latest paid / shipped / delivered order."""
+    if not whatsapp_helper.is_configured():
+        raise HTTPException(status_code=400, detail="WhatsApp is not configured")
+    if payload.order_id:
+        order = db.query(models.Order).filter(models.Order.id == payload.order_id).first()
+    else:
+        last10 = "".join(c for c in payload.phone if c.isdigit())[-10:]
+        if len(last10) != 10:
+            raise HTTPException(status_code=400, detail="Send a phone number or an order_id")
+        order = (
+            db.query(models.Order)
+            .filter(
+                models.Order.customer_phone.like(f"%{last10}"),
+                models.Order.status.in_([models.OrderStatus.paid, models.OrderStatus.shipped, models.OrderStatus.delivered]),
+            )
+            .order_by(models.Order.created_at.desc())
+            .first()
+        )
+    if not order:
+        raise HTTPException(status_code=404, detail="No paid, shipped or delivered order found for that number")
+    n = review_requests.send_request(db, order)
+    logger.info("Admin %s sent the review form for %s: %s", current.username, order.order_number, n.status)
+    return {"order_number": order.order_number, "phone": n.customer_phone, "status": n.status, "error": n.error_message or ""}
+
+
 @app.patch("/api/admin/reviews/{review_id}/toggle", response_model=schemas.AdminReviewOut)
 def admin_toggle_review(review_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     review = db.query(models.Review).filter(models.Review.id == review_id).first()
