@@ -117,6 +117,25 @@
             "max-file-size-kb": 10240
           },
           {
+            "type": "TextCaption",
+            "text": "Photo saved in your Files instead?"
+          },
+          {
+            "type": "EmbeddedLink",
+            "text": "Upload a document",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "DOCUMENTS"
+              },
+              "payload": {
+                "rating": "${data.rating}",
+                "feedback": "${data.feedback}"
+              }
+            }
+          },
+          {
             "type": "Footer",
             "label": "Submit review",
             "on-click-action": {
@@ -125,6 +144,61 @@
                 "rating": "${data.rating}",
                 "feedback": "${data.feedback}",
                 "photos": "${form.photos}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "DOCUMENTS",
+      "title": "Upload a document",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "rating": {
+          "type": "string",
+          "__example__": "5"
+        },
+        "feedback": {
+          "type": "string",
+          "__example__": "Great fit!"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Upload a photo, get 20% off"
+          },
+          {
+            "type": "TextBody",
+            "text": "Choose a photo of your order from your phone's files (JPG, PNG or WEBP) and we'll WhatsApp you a 20% discount code for your next purchase. Optional – you can submit without it."
+          },
+          {
+            "type": "DocumentPicker",
+            "name": "documents",
+            "label": "Upload document",
+            "description": "Up to 3 files, 10 MB each.",
+            "min-uploaded-documents": 0,
+            "max-uploaded-documents": 3,
+            "max-file-size-kb": 10240,
+            "allowed-mime-types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Submit review",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "rating": "${data.rating}",
+                "feedback": "${data.feedback}",
+                "documents": "${form.documents}"
               }
             }
           }
