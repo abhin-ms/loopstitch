@@ -302,3 +302,21 @@ def test_decrypt_flow_media(monkeypatch):
     FakeResp.content = blob[:-1] + bytes([blob[-1] ^ 1])
     with pytest.raises(RuntimeError):
         whatsapp_helper.decrypt_flow_media("https://mmg.whatsapp.net/x", meta)
+
+
+def test_admin_can_send_review_form_now_by_phone(db, product, client, admin_token, sent):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    make_order(db, product, phone="9876543210", delivered_days_ago=None, status=models.OrderStatus.paid, number="LS-OLD")
+    order_id = make_order(db, product, phone="+91 98765 43210", delivered_days_ago=None, status=models.OrderStatus.shipped, number="LS-NEW")
+    make_order(db, product, phone="9876543210", delivered_days_ago=None, status=models.OrderStatus.cancelled, number="LS-CANCELLED")
+
+    r = client.post("/api/admin/review-requests/send", json={"phone": "919876543210"}, headers=headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "sent" and r.json()["order_number"] in ("LS-OLD", "LS-NEW")
+    assert len(sent) == 1
+
+    r = client.post("/api/admin/review-requests/send", json={"order_id": order_id}, headers=headers)
+    assert r.json()["order_number"] == "LS-NEW" and review_requests.order_id_from_token(sent[1]["token"]) == order_id
+
+    assert client.post("/api/admin/review-requests/send", json={"phone": "911111111111"}, headers=headers).status_code == 404
+    assert client.post("/api/admin/review-requests/send", json={"phone": "919876543210"}).status_code == 401

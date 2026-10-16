@@ -215,6 +215,11 @@ class OrderOut(BaseModel):
         from_attributes = True
 
 
+class ReviewRequestSend(BaseModel):
+    phone: str = Field(default="", max_length=30)  # sends for this customer's latest order
+    order_id: Optional[int] = None  # or for this exact order
+
+
 class IdList(BaseModel):
     ids: List[int] = Field(min_length=1, max_length=500)
 
