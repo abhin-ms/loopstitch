@@ -704,10 +704,16 @@ class ReviewOut(BaseModel):
     title: str
     body: str
     is_approved: bool
+    source: Optional[str] = "website"
+    photos: List[str] = []
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class AdminReviewOut(ReviewOut):
+    order_id: Optional[int] = None
 
 
 class ReviewSummary(BaseModel):

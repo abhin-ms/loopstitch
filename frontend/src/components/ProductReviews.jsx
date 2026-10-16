@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StarRating from './StarRating'
+import ReviewPhotos from './ReviewPhotos'
 
 export default function ProductReviews({ slug, onSummary }) {
   const [data, setData] = useState({ average: 0, count: 0, reviews: [] })
@@ -90,7 +91,10 @@ export default function ProductReviews({ slug, onSummary }) {
             <StarRating value={r.rating} />
             {r.title && <h3 className="font-medium text-paper mt-3">{r.title}</h3>}
             {r.body && <p className="text-sm text-paper/70 leading-relaxed mt-1">{r.body}</p>}
-            <p className="font-mono text-[11px] text-slate mt-3 uppercase tracking-wider">{r.name}</p>
+            <ReviewPhotos photos={r.photos} name={r.name} />
+            <p className="font-mono text-[11px] text-slate mt-3 uppercase tracking-wider">
+              {r.name}{r.source === 'whatsapp' && <span className="text-acid"> · Verified buyer</span>}
+            </p>
           </article>
         ))}
       </div>

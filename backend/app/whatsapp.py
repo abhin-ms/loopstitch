@@ -23,6 +23,8 @@ LAUNCH_TEMPLATE = os.getenv("WHATSAPP_LAUNCH_TEMPLATE", "store_launch")
 WELCOME_TEMPLATE = os.getenv("WHATSAPP_WELCOME_TEMPLATE", "subscribe_confirm")
 # order_shipped has a static "Track order" link button, so only body variables are sent
 SHIPPED_TEMPLATE = os.getenv("WHATSAPP_SHIPPED_TEMPLATE", "order_shipped")
+# order_review has a Flow button that opens the review form (stars, feedback, photos)
+REVIEW_TEMPLATE = os.getenv("WHATSAPP_REVIEW_TEMPLATE", "order_review")
 TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "en")
 
 # Owner alert for every confirmed order (see owner_alerts.py). Fixed here on purpose:
@@ -224,6 +226,128 @@ def send_launch_message(phone: str, template: str = "") -> Dict[str, Any]:
         raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
     messages = data.get("messages", [])
     return {"message_id": messages[0].get("id", "") if messages else ""}
+
+
+# ---------------------------------------------------------------- review request
+def send_review_message(phone: str, customer_name: str, order_number: str, flow_token: str) -> Dict[str, Any]:
+    """
+    order_review template: body {{1}} = customer first name, {{2}} = order number, and a Flow
+    button (index 0) that opens the review form. The flow_token comes back with the answers,
+    which is how review_requests.py knows which order they belong to.
+    """
+    if not is_configured():
+        raise RuntimeError("WhatsApp is not configured — missing PHONE_NUMBER_ID or ACCESS_TOKEN")
+    first_name = customer_name.strip().split()[0] if customer_name.strip() else "there"
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "".join(c for c in phone if c.isdigit()),
+        "type": "template",
+        "template": {
+            "name": REVIEW_TEMPLATE,
+            "language": {"policy": "deterministic", "code": TEMPLATE_LANG},
+            "components": [
+                {"type": "body", "parameters": [
+                    {"type": "text", "text": _template_text(first_name)},
+                    {"type": "text", "text": _template_text(order_number)},
+                ]},
+                {"type": "button", "sub_type": "flow", "index": 0, "parameters": [
+                    {"type": "action", "action": {"flow_token": flow_token}},
+                ]},
+            ],
+        },
+    }
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.post(f"{BASE_URL}/{PHONE_NUMBER_ID}/messages", json=payload, headers=_headers())
+        data = resp.json()
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
+    messages = data.get("messages", [])
+    if not messages:
+        raise RuntimeError("WhatsApp API returned no messages in response")
+    return {"message_id": messages[0].get("id", "")}
+
+
+def send_text_message(phone: str, text: str) -> Dict[str, Any]:
+    """Plain text message. Only delivered inside the 24-hour window after the customer wrote to
+    us (e.g. right after they submit the review form); outside it Meta rejects it."""
+    if not is_configured():
+        raise RuntimeError("WhatsApp is not configured — missing PHONE_NUMBER_ID or ACCESS_TOKEN")
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "".join(c for c in phone if c.isdigit()),
+        "type": "text",
+        "text": {"preview_url": False, "body": text},
+    }
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.post(f"{BASE_URL}/{PHONE_NUMBER_ID}/messages", json=payload, headers=_headers())
+        data = resp.json()
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
+    messages = data.get("messages", [])
+    return {"message_id": messages[0].get("id", "") if messages else ""}
+
+
+MAX_MEDIA_BYTES = 25 * 1024 * 1024
+
+
+def download_media(media_id: str) -> bytes:
+    """Download a file a customer sent (e.g. a review-form photo) by its WhatsApp media id."""
+    if not is_configured():
+        raise RuntimeError("WhatsApp is not configured — missing PHONE_NUMBER_ID or ACCESS_TOKEN")
+    with httpx.Client(timeout=30.0) as client:
+        meta = client.get(f"{BASE_URL}/{media_id}", headers=_headers())
+        if meta.status_code != 200:
+            raise RuntimeError(f"WhatsApp media lookup failed ({meta.status_code})")
+        url = meta.json().get("url", "")
+        if not url:
+            raise RuntimeError("WhatsApp media lookup returned no url")
+        resp = client.get(url, headers={"Authorization": f"Bearer {ACCESS_TOKEN}"})
+    if resp.status_code != 200:
+        raise RuntimeError(f"WhatsApp media download failed ({resp.status_code})")
+    if len(resp.content) > MAX_MEDIA_BYTES:
+        raise RuntimeError("WhatsApp media is too large")
+    return resp.content
+
+
+def decrypt_flow_media(cdn_url: str, encryption_metadata: Dict[str, str]) -> bytes:
+    """
+    Download + decrypt a Flow upload delivered as {cdn_url, encryption_metadata}.
+    The CDN file is AES-256-CBC ciphertext followed by the first 10 bytes of
+    HMAC-SHA256(hmac_key, iv + ciphertext); hashes are checked before and after decrypting.
+    """
+    import base64
+    import hashlib
+    import hmac
+
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    def b64(name: str) -> bytes:
+        return base64.b64decode(encryption_metadata[name])
+
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.get(cdn_url)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Flow media download failed ({resp.status_code})")
+    blob = resp.content
+    if len(blob) > MAX_MEDIA_BYTES or len(blob) <= 10:
+        raise RuntimeError("Flow media has an unexpected size")
+    if not hmac.compare_digest(hashlib.sha256(blob).digest(), b64("encrypted_hash")):
+        raise RuntimeError("Flow media hash mismatch")
+    ciphertext, tag = blob[:-10], blob[-10:]
+    iv = b64("iv")
+    expected = hmac.new(b64("hmac_key"), iv + ciphertext, hashlib.sha256).digest()[:10]
+    if not hmac.compare_digest(expected, tag):
+        raise RuntimeError("Flow media HMAC mismatch")
+    decryptor = Cipher(algorithms.AES(b64("encryption_key")), modes.CBC(iv)).decryptor()
+    padded = decryptor.update(ciphertext) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    plain = unpadder.update(padded) + unpadder.finalize()
+    if not hmac.compare_digest(hashlib.sha256(plain).digest(), b64("plaintext_hash")):
+        raise RuntimeError("Flow media plaintext hash mismatch")
+    return plain
 
 
 # ---------------------------------------------------------------- owner alert

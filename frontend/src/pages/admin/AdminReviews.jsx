@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../../api/client'
 import Loader from '../../components/Loader'
 import StarRating from '../../components/StarRating'
+import ReviewPhotos from '../../components/ReviewPhotos'
 
 export default function AdminReviews() {
   const [reviews, setReviews] = useState(null)
@@ -36,7 +37,7 @@ export default function AdminReviews() {
   return (
     <div>
       <h1 className="font-display text-2xl sm:text-3xl uppercase text-paper mb-2">Reviews</h1>
-      <p className="font-mono text-[11px] text-slate mb-8">New reviews stay hidden until you approve them. Only approved reviews show on the storefront.</p>
+      <p className="font-mono text-[11px] text-slate mb-8">New reviews stay hidden until you approve them. Only approved reviews show on the storefront. Reviews from the WhatsApp form (with the customer's photos) show on every product in their order.</p>
 
       {reviews.length === 0 ? (
         <p className="font-mono text-sm text-slate">No reviews yet.</p>
@@ -48,6 +49,7 @@ export default function AdminReviews() {
                 <div className="flex items-center gap-3">
                   <StarRating value={r.rating} />
                   <span className="font-mono text-xs text-paper">{r.name}</span>
+                  {r.source === 'whatsapp' && <span className="font-mono text-[10px] uppercase tracking-wider text-slate">WhatsApp</span>}
                   <span className={`font-mono text-[10px] uppercase tracking-wider ${r.is_approved ? 'text-acid' : 'text-riot'}`}>
                     {r.is_approved ? 'Approved' : 'Pending'}
                   </span>
@@ -63,6 +65,7 @@ export default function AdminReviews() {
               </div>
               {r.title && <p className="font-medium text-paper text-sm mt-3">{r.title}</p>}
               {r.body && <p className="text-paper/70 text-sm mt-1 leading-relaxed">{r.body}</p>}
+              <ReviewPhotos photos={r.photos} name={r.name} />
             </div>
           ))}
         </div>

@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext'
 import { formatINR } from '../../utils/format'
 import { useToast } from '../context/ToastContext'
 import StitchLoader from '../components/StitchLoader'
+import MobileReviews from '../components/MobileReviews'
 import LikeButton from '../../components/LikeButton'
 import { viewContent } from '../../utils/pixel'
 
@@ -128,6 +129,7 @@ export default function MobileProductDetail() {
           Printed on premium 250 GSM cotton fabric. Part of a limited run — once a size sells out it is retired, not restocked.
         </p>
       </div>
+      <MobileReviews slug={product.slug} />
     </div>
   )
 }
