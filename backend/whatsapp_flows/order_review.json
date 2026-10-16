@@ -1,0 +1,62 @@
+{
+  "version": "7.3",
+  "screens": [
+    {
+      "id": "REVIEW",
+      "title": "Rate your order",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "How was your Loopstitch order?" },
+          { "type": "TextBody", "text": "Your feedback helps us make better tees." },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "rating",
+            "label": "Your rating",
+            "required": true,
+            "data-source": [
+              { "id": "5", "title": "★★★★★", "description": "Loved it" },
+              { "id": "4", "title": "★★★★☆", "description": "Liked it" },
+              { "id": "3", "title": "★★★☆☆", "description": "It was okay" },
+              { "id": "2", "title": "★★☆☆☆", "description": "Not great" },
+              { "id": "1", "title": "★☆☆☆☆", "description": "Disappointed" }
+            ]
+          },
+          {
+            "type": "TextArea",
+            "name": "feedback",
+            "label": "Your feedback",
+            "helper-text": "Fit, fabric, print, delivery – tell us anything",
+            "required": false,
+            "max-length": 600
+          },
+          {
+            "type": "PhotoPicker",
+            "name": "photos",
+            "label": "Add photos (optional)",
+            "description": "Take a photo with your camera or upload from your gallery. Up to 3 photos.",
+            "photo-source": "camera_gallery",
+            "min-uploaded-photos": 0,
+            "max-uploaded-photos": 3,
+            "max-file-size-kb": 10240
+          },
+          {
+            "type": "Footer",
+            "label": "Submit review",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "rating": "${form.rating}",
+                "feedback": "${form.feedback}",
+                "photos": "${form.photos}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

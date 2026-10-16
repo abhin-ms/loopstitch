@@ -34,6 +34,7 @@ from . import courier
 from . import launch_alerts
 from . import mailer
 from . import meta_capi
+from . import review_requests
 from . import imaging
 from . import visits as visits_helper
 from . import customer_auth
@@ -955,6 +956,8 @@ def update_order_status(order_id: int, payload: schemas.OrderStatusUpdate, db: S
             raise HTTPException(status_code=409, detail="Not enough stock left to reopen this order")
         if payload.status == models.OrderStatus.paid:
             courier.schedule_pickup(db, order)
+        if payload.status == models.OrderStatus.delivered and order.delivered_at is None:
+            order.delivered_at = _utcnow()  # starts the WhatsApp review request countdown
     db.commit()
     db.refresh(order)
     return order
@@ -1380,8 +1383,9 @@ def whatsapp_webhook_verify(request: Request):
 
 
 @app.post("/api/webhooks/whatsapp")
-async def whatsapp_webhook(request: Request):
-    """Meta Cloud API webhook — message status updates (sent / delivered / read / failed)."""
+async def whatsapp_webhook(request: Request, background: BackgroundTasks):
+    """Meta Cloud API webhook — message status updates (sent / delivered / read / failed)
+    and review-form answers (nfm_reply messages, saved in the background)."""
     raw = await request.body()
     if WHATSAPP_APP_SECRET:
         import hashlib
@@ -1404,6 +1408,10 @@ async def whatsapp_webhook(request: Request):
         return {"status": "ok"}
 
     value = changes[0].get("value", {})
+    for message in value.get("messages", []) or []:
+        if message.get("type") == "interactive" and (message.get("interactive") or {}).get("type") == "nfm_reply":
+            # photo downloads can take a while; answer Meta right away
+            background.add_task(review_requests.handle_flow_reply, message, store_upload)
     statuses = value.get("statuses", [])
     db = SessionLocal()
     try:
@@ -1511,6 +1519,15 @@ def admin_resend_notification(
         n.error_message = ""
         db.flush()
         owner_alerts.deliver(n, owner_alerts.build_params(db, order))
+        db.commit()
+        db.refresh(n)
+        return n
+
+    if n.message_type == review_requests.MESSAGE_TYPE:
+        n.status = "pending"
+        n.error_message = ""
+        db.flush()
+        review_requests.deliver(n, order)
         db.commit()
         db.refresh(n)
         return n
@@ -2561,13 +2578,14 @@ def product_reviews(slug: str, db: Session = Depends(get_db)):
 
 @app.get("/api/reviews/featured", response_model=List[schemas.ReviewOut])
 def featured_reviews(db: Session = Depends(get_db)):
-    return (
+    rows = (
         db.query(models.Review)
         .filter(models.Review.is_approved == True, models.Review.rating >= 4)  # noqa: E712
         .order_by(models.Review.created_at.desc())
-        .limit(6)
+        .limit(30)
         .all()
     )
+    return _one_per_order(rows)[:6]
 
 
 @app.post("/api/products/{slug}/reviews")
@@ -2584,17 +2602,39 @@ def submit_review(slug: str, payload: schemas.ReviewIn, request: Request, db: Se
     return {"detail": "Thanks! Your review will appear once it has been approved."}
 
 
-@app.get("/api/admin/reviews", response_model=List[schemas.ReviewOut])
+@app.get("/api/admin/reviews", response_model=List[schemas.AdminReviewOut])
 def admin_list_reviews(db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
-    return db.query(models.Review).order_by(models.Review.created_at.desc()).all()
+    rows = db.query(models.Review).order_by(models.Review.created_at.desc()).all()
+    return _one_per_order(rows)
 
 
-@app.patch("/api/admin/reviews/{review_id}/toggle", response_model=schemas.ReviewOut)
+def _one_per_order(rows: list) -> list:
+    """A WhatsApp review is stored once per product in the order; keep the first copy only."""
+    seen, out = set(), []
+    for r in rows:
+        if r.order_id is not None:
+            if r.order_id in seen:
+                continue
+            seen.add(r.order_id)
+        out.append(r)
+    return out
+
+
+def _review_copies(db: Session, review: models.Review) -> list:
+    """The review plus its copies on the order's other products (approve / delete them together)."""
+    if review.order_id is None:
+        return [review]
+    return db.query(models.Review).filter(models.Review.order_id == review.order_id).all()
+
+
+@app.patch("/api/admin/reviews/{review_id}/toggle", response_model=schemas.AdminReviewOut)
 def admin_toggle_review(review_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     review = db.query(models.Review).filter(models.Review.id == review_id).first()
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
-    review.is_approved = not review.is_approved
+    approved = not review.is_approved
+    for row in _review_copies(db, review):
+        row.is_approved = approved
     db.commit()
     db.refresh(review)
     return review
@@ -2605,7 +2645,8 @@ def admin_delete_review(review_id: int, db: Session = Depends(get_db), current: 
     review = db.query(models.Review).filter(models.Review.id == review_id).first()
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
-    db.delete(review)
+    for row in _review_copies(db, review):
+        db.delete(row)
     db.commit()
     return {"detail": "Review deleted"}
 

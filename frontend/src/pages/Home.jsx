@@ -7,6 +7,7 @@ import ProductSkeleton from '../components/ProductSkeleton'
 import TrustStrip from '../components/TrustStrip'
 import NewsletterForm from '../components/NewsletterForm'
 import StarRating from '../components/StarRating'
+import ReviewPhotos from '../components/ReviewPhotos'
 import OfferBanner from '../components/OfferBanner'
 import InstagramSection from '../components/InstagramSection'
 import SocialSection from '../components/SocialSection'
@@ -204,7 +205,8 @@ export default function Home() {
             {reviews.slice(0, 3).map((r) => (
               <figure key={r.id} className="border border-panel-2 p-5">
                 <StarRating value={r.rating} />
-                <blockquote className="text-sm text-paper/80 leading-relaxed mt-3">{r.body || r.title}</blockquote>
+                {(r.body || r.title) && <blockquote className="text-sm text-paper/80 leading-relaxed mt-3">{r.body || r.title}</blockquote>}
+                <ReviewPhotos photos={r.photos} name={r.name} size={64} />
                 <figcaption className="font-mono text-[11px] text-slate mt-3 uppercase tracking-wider">{r.name}</figcaption>
               </figure>
             ))}

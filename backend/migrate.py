@@ -67,6 +67,8 @@ def ensure_columns() -> None:
             models.Order.courier_status,
             models.Order.courier_error,
             models.Order.shipped_msg_sent,
+            models.Order.delivered_at,
+            models.Order.review_msg_sent,
         ],
         "order_items": [
             models.OrderItem.line_discount,
@@ -96,6 +98,11 @@ def ensure_columns() -> None:
         ],
         "otps": [
             models.OTP.attempts,
+        ],
+        "reviews": [
+            models.Review.source,
+            models.Review.order_id,
+            models.Review.photos_json,
         ],
     }
     with engine.begin() as conn:

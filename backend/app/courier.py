@@ -10,6 +10,8 @@ Automatic Delhivery pickups.
 3. Every few hours sync_tracking() moves orders to shipped / delivered.
 4. Every tick, unpaid online orders older than ORDER_PAYMENT_TIMEOUT_MINUTES
    are failed and their stock is released (order_lifecycle.expire_unpaid_orders).
+5. Every tick, orders delivered a few days ago get the WhatsApp review form
+   (review_requests.send_due).
 
 Runs as its own process (see supervisord.conf) so the 2 web workers can't
 book the same pickup twice:
@@ -23,7 +25,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from . import delhivery, launch_alerts, models, order_lifecycle
+from . import delhivery, launch_alerts, models, order_lifecycle, review_requests
 from . import whatsapp as whatsapp_helper
 from .database import SessionLocal
 from .offers import set_setting
@@ -231,6 +233,8 @@ def sync_tracking(db: Session) -> int:
         lowered = status.strip().lower()
         if lowered == "delivered":
             order.status = models.OrderStatus.delivered
+            if order.delivered_at is None:
+                order.delivered_at = _utcnow()  # review_requests.py asks for a review a few days later
         elif lowered not in PRE_PICKUP and order.status == models.OrderStatus.paid:
             order.status = models.OrderStatus.shipped
     db.commit()
@@ -267,6 +271,15 @@ def tick() -> None:
         except Exception:
             db.rollback()
             logger.exception("Launch alerts failed")
+
+        # WhatsApp review form, a few days after delivery (works for orders marked delivered by hand too)
+        try:
+            sent = review_requests.send_due(db)
+            if sent:
+                logger.info("Review requests sent for %s delivered orders", sent)
+        except Exception:
+            db.rollback()
+            logger.exception("Review requests failed")
 
         if not delhivery.is_configured():
             return

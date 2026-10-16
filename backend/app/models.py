@@ -1,5 +1,6 @@
 import datetime
 import enum
+import json
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey, Text, Enum,
     UniqueConstraint, Index
@@ -210,6 +211,9 @@ class Order(Base):
     courier_status = Column(String(80), default="")
     courier_error = Column(Text, nullable=True)
     shipped_msg_sent = Column(Boolean, default=False)
+    # WhatsApp review request (review_requests.py): sent once, a few days after delivery
+    delivered_at = Column(DateTime, nullable=True)
+    review_msg_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -449,9 +453,21 @@ class Review(Base):
     title = Column(String(150), default="")
     body = Column(Text, default="")
     is_approved = Column(Boolean, default=False, index=True)
+    # Reviews from the WhatsApp review form carry the order and the customer's photos
+    source = Column(String(20), default="website")  # website | whatsapp
+    order_id = Column(Integer, nullable=True, index=True)  # no FK: the review survives order deletion
+    photos_json = Column(Text, nullable=True)  # JSON list of photo URLs
     created_at = Column(DateTime, default=_utcnow)
 
     product = relationship("Product")
+
+    @property
+    def photos(self) -> list:
+        try:
+            urls = json.loads(self.photos_json or "[]")
+        except ValueError:
+            return []
+        return [u for u in urls if isinstance(u, str)] if isinstance(urls, list) else []
 
 
 class Announcement(Base):
