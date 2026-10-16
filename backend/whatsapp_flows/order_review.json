@@ -117,20 +117,6 @@
             "max-file-size-kb": 10240
           },
           {
-            "type": "DocumentPicker",
-            "name": "documents",
-            "label": "Or upload a document",
-            "description": "Photo saved in your Files? Upload it here (JPG, PNG or WEBP). Up to 3 files.",
-            "min-uploaded-documents": 0,
-            "max-uploaded-documents": 3,
-            "max-file-size-kb": 10240,
-            "allowed-mime-types": [
-              "image/jpeg",
-              "image/png",
-              "image/webp"
-            ]
-          },
-          {
             "type": "Footer",
             "label": "Submit review",
             "on-click-action": {
@@ -138,8 +124,7 @@
               "payload": {
                 "rating": "${data.rating}",
                 "feedback": "${data.feedback}",
-                "photos": "${form.photos}",
-                "documents": "${form.documents}"
+                "photos": "${form.photos}"
               }
             }
           }
