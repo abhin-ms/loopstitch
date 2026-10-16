@@ -3,8 +3,8 @@ WhatsApp review requests.
 
 1. A few days after an order is delivered (REVIEW_REQUEST_DELAY_DAYS, default 2) the courier
    worker sends the order_review template once. Its Flow button opens the review form:
-   star rating, feedback text, then up to 3 photos from the camera / gallery (PhotoPicker)
-   or from the phone's files (DocumentPicker, on its own screen: Meta allows one per screen).
+   star rating and feedback text, then an optional upload screen with up to 3 photos from the
+   camera / gallery (PhotoPicker) and/or files (DocumentPicker).
 2. When the customer submits, Meta posts an nfm_reply message to /api/webhooks/whatsapp.
    handle_flow_reply() checks the signed flow_token, downloads the photos, re-encodes them as
    JPEG (which also strips EXIF / GPS data) and saves one Review per product in the order.
@@ -13,9 +13,8 @@ WhatsApp review requests.
    that never expires; without a photo, just a thank-you.
 4. Reviews stay hidden until an admin approves them, like website reviews.
 
-The Flow's terminal screens complete with (media at the top level, as Meta requires):
-    {"rating": ..., "feedback": ..., "photos": "${form.photos}"}       camera / gallery screen
-    {"rating": ..., "feedback": ..., "documents": "${form.documents}"} files screen
+The Flow's last screen completes with (media at the top level, as Meta requires):
+    {"rating": ..., "feedback": ..., "photos": "${form.photos}", "documents": "${form.documents}"}
 See whatsapp_flows/order_review.json.
 """
 import datetime

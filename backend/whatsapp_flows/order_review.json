@@ -8,8 +8,14 @@
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "How was your Loopstitch order?" },
-          { "type": "TextBody", "text": "Your feedback helps us make better tees." },
+          {
+            "type": "TextHeading",
+            "text": "How was your Loopstitch order?"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your feedback helps us make better tees."
+          },
           {
             "type": "TextBody",
             "markdown": true,
@@ -21,11 +27,31 @@
             "label": "Your rating",
             "required": true,
             "data-source": [
-              { "id": "5", "title": "★★★★★", "description": "Loved it" },
-              { "id": "4", "title": "★★★★☆", "description": "Liked it" },
-              { "id": "3", "title": "★★★☆☆", "description": "It was okay" },
-              { "id": "2", "title": "★★☆☆☆", "description": "Not great" },
-              { "id": "1", "title": "★☆☆☆☆", "description": "Disappointed" }
+              {
+                "id": "5",
+                "title": "★★★★★",
+                "description": "Loved it"
+              },
+              {
+                "id": "4",
+                "title": "★★★★☆",
+                "description": "Liked it"
+              },
+              {
+                "id": "3",
+                "title": "★★★☆☆",
+                "description": "It was okay"
+              },
+              {
+                "id": "2",
+                "title": "★★☆☆☆",
+                "description": "Not great"
+              },
+              {
+                "id": "1",
+                "title": "★☆☆☆☆",
+                "description": "Disappointed"
+              }
             ]
           },
           {
@@ -41,7 +67,10 @@
             "label": "Next: add photos",
             "on-click-action": {
               "name": "navigate",
-              "next": { "type": "screen", "name": "PHOTOS" },
+              "next": {
+                "type": "screen",
+                "name": "PHOTOS"
+              },
               "payload": {
                 "rating": "${form.rating}",
                 "feedback": "${form.feedback}"
@@ -57,16 +86,25 @@
       "terminal": true,
       "success": true,
       "data": {
-        "rating": { "type": "string", "__example__": "5" },
-        "feedback": { "type": "string", "__example__": "Great fit!" }
+        "rating": {
+          "type": "string",
+          "__example__": "5"
+        },
+        "feedback": {
+          "type": "string",
+          "__example__": "Great fit!"
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Upload a photo, get 20% off" },
+          {
+            "type": "TextHeading",
+            "text": "Upload a photo, get 20% off"
+          },
           {
             "type": "TextBody",
-            "text": "Add a photo of your order and we'll WhatsApp you a 20% discount code for your next purchase."
+            "text": "Add a photo of your order and we'll WhatsApp you a 20% discount code for your next purchase. Photos are optional – you can submit without them."
           },
           {
             "type": "PhotoPicker",
@@ -79,62 +117,18 @@
             "max-file-size-kb": 10240
           },
           {
-            "type": "TextCaption",
-            "text": "Photo saved in your Files instead?"
-          },
-          {
-            "type": "EmbeddedLink",
-            "text": "Upload a document",
-            "on-click-action": {
-              "name": "navigate",
-              "next": { "type": "screen", "name": "DOCUMENTS" },
-              "payload": {
-                "rating": "${data.rating}",
-                "feedback": "${data.feedback}"
-              }
-            }
-          },
-          {
-            "type": "Footer",
-            "label": "Submit review",
-            "on-click-action": {
-              "name": "complete",
-              "payload": {
-                "rating": "${data.rating}",
-                "feedback": "${data.feedback}",
-                "photos": "${form.photos}"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "DOCUMENTS",
-      "title": "Upload a document",
-      "terminal": true,
-      "success": true,
-      "data": {
-        "rating": { "type": "string", "__example__": "5" },
-        "feedback": { "type": "string", "__example__": "Great fit!" }
-      },
-      "layout": {
-        "type": "SingleColumnLayout",
-        "children": [
-          { "type": "TextHeading", "text": "Upload a photo, get 20% off" },
-          {
-            "type": "TextBody",
-            "text": "Choose a photo of your order from your phone's files (JPG, PNG or WEBP) and we'll WhatsApp you a 20% discount code for your next purchase."
-          },
-          {
             "type": "DocumentPicker",
             "name": "documents",
-            "label": "Upload document",
-            "description": "Up to 3 files, 10 MB each.",
+            "label": "Or upload a document",
+            "description": "Photo saved in your Files? Upload it here (JPG, PNG or WEBP). Up to 3 files.",
             "min-uploaded-documents": 0,
             "max-uploaded-documents": 3,
             "max-file-size-kb": 10240,
-            "allowed-mime-types": ["image/jpeg", "image/png", "image/webp"]
+            "allowed-mime-types": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
           },
           {
             "type": "Footer",
@@ -144,6 +138,7 @@
               "payload": {
                 "rating": "${data.rating}",
                 "feedback": "${data.feedback}",
+                "photos": "${form.photos}",
                 "documents": "${form.documents}"
               }
             }
