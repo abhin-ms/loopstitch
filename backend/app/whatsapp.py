@@ -268,6 +268,27 @@ def send_review_message(phone: str, customer_name: str, order_number: str, flow_
     return {"message_id": messages[0].get("id", "")}
 
 
+def send_text_message(phone: str, text: str) -> Dict[str, Any]:
+    """Plain text message. Only delivered inside the 24-hour window after the customer wrote to
+    us (e.g. right after they submit the review form); outside it Meta rejects it."""
+    if not is_configured():
+        raise RuntimeError("WhatsApp is not configured — missing PHONE_NUMBER_ID or ACCESS_TOKEN")
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "".join(c for c in phone if c.isdigit()),
+        "type": "text",
+        "text": {"preview_url": False, "body": text},
+    }
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.post(f"{BASE_URL}/{PHONE_NUMBER_ID}/messages", json=payload, headers=_headers())
+        data = resp.json()
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"WhatsApp API error ({resp.status_code}): {data.get('error', {}).get('message', resp.text)}")
+    messages = data.get("messages", [])
+    return {"message_id": messages[0].get("id", "") if messages else ""}
+
+
 MAX_MEDIA_BYTES = 25 * 1024 * 1024
 
 

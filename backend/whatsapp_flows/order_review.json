@@ -4,14 +4,17 @@
     {
       "id": "REVIEW",
       "title": "Rate your order",
-      "terminal": true,
-      "success": true,
       "data": {},
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           { "type": "TextHeading", "text": "How was your Loopstitch order?" },
           { "type": "TextBody", "text": "Your feedback helps us make better tees." },
+          {
+            "type": "TextBody",
+            "markdown": true,
+            "text": "📸 **Upload a photo of your order and get 20% off your next purchase!**"
+          },
           {
             "type": "RadioButtonsGroup",
             "name": "rating",
@@ -34,14 +37,62 @@
             "max-length": 600
           },
           {
+            "type": "Footer",
+            "label": "Next: add photos",
+            "on-click-action": {
+              "name": "navigate",
+              "next": { "type": "screen", "name": "PHOTOS" },
+              "payload": {
+                "rating": "${form.rating}",
+                "feedback": "${form.feedback}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PHOTOS",
+      "title": "Add photos",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "rating": { "type": "string", "__example__": "5" },
+        "feedback": { "type": "string", "__example__": "Great fit!" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Upload a photo, get 20% off" },
+          {
+            "type": "TextBody",
+            "text": "Add a photo of your order and we'll WhatsApp you a 20% discount code for your next purchase."
+          },
+          {
             "type": "PhotoPicker",
             "name": "photos",
-            "label": "Add photos (optional)",
-            "description": "Take a photo with your camera or upload from your gallery. Up to 3 photos.",
+            "label": "Take or choose photos",
+            "description": "Use your camera or pick from your gallery. Up to 3 photos.",
             "photo-source": "camera_gallery",
             "min-uploaded-photos": 0,
             "max-uploaded-photos": 3,
             "max-file-size-kb": 10240
+          },
+          {
+            "type": "TextCaption",
+            "text": "Photo saved in your Files instead?"
+          },
+          {
+            "type": "EmbeddedLink",
+            "text": "Upload a document",
+            "on-click-action": {
+              "name": "navigate",
+              "next": { "type": "screen", "name": "DOCUMENTS" },
+              "payload": {
+                "rating": "${data.rating}",
+                "feedback": "${data.feedback}"
+              }
+            }
           },
           {
             "type": "Footer",
@@ -49,9 +100,51 @@
             "on-click-action": {
               "name": "complete",
               "payload": {
-                "rating": "${form.rating}",
-                "feedback": "${form.feedback}",
+                "rating": "${data.rating}",
+                "feedback": "${data.feedback}",
                 "photos": "${form.photos}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "DOCUMENTS",
+      "title": "Upload a document",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "rating": { "type": "string", "__example__": "5" },
+        "feedback": { "type": "string", "__example__": "Great fit!" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Upload a photo, get 20% off" },
+          {
+            "type": "TextBody",
+            "text": "Choose a photo of your order from your phone's files (JPG, PNG or WEBP) and we'll WhatsApp you a 20% discount code for your next purchase."
+          },
+          {
+            "type": "DocumentPicker",
+            "name": "documents",
+            "label": "Upload document",
+            "description": "Up to 3 files, 10 MB each.",
+            "min-uploaded-documents": 0,
+            "max-uploaded-documents": 3,
+            "max-file-size-kb": 10240,
+            "allowed-mime-types": ["image/jpeg", "image/png", "image/webp"]
+          },
+          {
+            "type": "Footer",
+            "label": "Submit review",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "rating": "${data.rating}",
+                "feedback": "${data.feedback}",
+                "documents": "${form.documents}"
               }
             }
           }

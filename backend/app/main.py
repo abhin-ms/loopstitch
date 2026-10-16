@@ -1523,6 +1523,36 @@ def admin_resend_notification(
         db.refresh(n)
         return n
 
+    if n.message_type == review_requests.REWARD_MESSAGE_TYPE:
+        # same coupon again; plain text only reaches them within 24 h of their last message
+        code = review_requests.reward_code(n)
+        if not code:
+            raise HTTPException(status_code=400, detail="No coupon code recorded on this notification")
+        n.status = "pending"
+        db.flush()
+        review_requests.deliver_reward(n, order, code)
+        if n.status == "sent":
+            n.error_message = f"Coupon {code}"
+        db.commit()
+        db.refresh(n)
+        return n
+
+    if n.message_type == review_requests.THANKS_MESSAGE_TYPE:
+        n.status = "pending"
+        n.error_message = ""
+        db.flush()
+        try:
+            result = whatsapp_helper.send_text_message(n.customer_phone, review_requests.thanks_text(order.customer_name))
+            n.whatsapp_message_id = result.get("message_id", "")
+            n.status = "sent"
+            n.sent_at = _utcnow()
+        except Exception as exc:
+            n.status = "failed"
+            n.error_message = str(exc)[:500]
+        db.commit()
+        db.refresh(n)
+        return n
+
     if n.message_type == review_requests.MESSAGE_TYPE:
         n.status = "pending"
         n.error_message = ""

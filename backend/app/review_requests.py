@@ -3,17 +3,24 @@ WhatsApp review requests.
 
 1. A few days after an order is delivered (REVIEW_REQUEST_DELAY_DAYS, default 2) the courier
    worker sends the order_review template once. Its Flow button opens the review form:
-   star rating, feedback text and up to 3 photos (camera or gallery).
+   star rating, feedback text, then up to 3 photos from the camera / gallery (PhotoPicker)
+   or from the phone's files (DocumentPicker, on its own screen: Meta allows one per screen).
 2. When the customer submits, Meta posts an nfm_reply message to /api/webhooks/whatsapp.
    handle_flow_reply() checks the signed flow_token, downloads the photos, re-encodes them as
    JPEG (which also strips EXIF / GPS data) and saves one Review per product in the order.
-3. Reviews stay hidden until an admin approves them, like website reviews.
+3. Right after the form is submitted we WhatsApp a text (the form reply opens the 24-hour
+   window): with a photo, a unique single-use REVIEW_REWARD_PERCENT (default 20) % coupon
+   that never expires; without a photo, just a thank-you.
+4. Reviews stay hidden until an admin approves them, like website reviews.
 
-The Flow's Footer must complete with this payload (photos at the top level, as Meta requires):
-    {"rating": "${form.rating}", "feedback": "${form.feedback}", "photos": "${form.photos}"}
+The Flow's terminal screens complete with (media at the top level, as Meta requires):
+    {"rating": ..., "feedback": ..., "photos": "${form.photos}"}       camera / gallery screen
+    {"rating": ..., "feedback": ..., "documents": "${form.documents}"} files screen
+See whatsapp_flows/order_review.json.
 """
 import datetime
 import hashlib
+import secrets
 import hmac
 import io
 import json
@@ -43,6 +50,9 @@ BATCH_SIZE = 50
 MAX_PHOTOS = 3
 PHOTO_MAX_SIDE = 1600
 FEEDBACK_MAX = 2000
+REWARD_PERCENT = float(os.getenv("REVIEW_REWARD_PERCENT", "20"))
+REWARD_MESSAGE_TYPE = "review_reward"
+THANKS_MESSAGE_TYPE = "review_thanks"
 # Flow uploads delivered as {cdn_url, encryption_metadata} must come from Meta's CDN
 CDN_HOST_SUFFIXES = (".whatsapp.net", ".fbcdn.net", ".fbsbx.com")
 _MEDIA_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
@@ -178,11 +188,19 @@ def clean_photo(raw: bytes) -> bytes:
         return out.getvalue()
 
 
-def _save_photos(items: Any, order_number: str, store: Store) -> List[str]:
-    if isinstance(items, dict):
-        items = [items]
-    if not isinstance(items, list):
-        return []
+def _media_items(answers: Dict[str, Any]) -> List[Any]:
+    """Photos from the camera / gallery screen and files from the documents screen, in one list."""
+    items: List[Any] = []
+    for key in ("photos", "documents"):
+        value = answers.get(key)
+        if isinstance(value, dict):
+            value = [value]
+        if isinstance(value, list):
+            items.extend(value)
+    return items
+
+
+def _save_photos(items: List[Any], order_number: str, store: Store) -> List[str]:
     urls = []
     for item in items[:MAX_PHOTOS]:
         try:
@@ -231,7 +249,8 @@ def save_flow_reply(db: Session, message: Dict[str, Any], store: Store) -> List[
         logger.info("Review form for %s has no catalogue products to attach to", order.order_number)
         return []
 
-    photos = _save_photos(answers.get("photos"), order.order_number, store)
+    uploads = _media_items(answers)
+    photos = _save_photos(uploads, order.order_number, store)
     rows = []
     for product_id in product_ids:
         row = models.Review(
@@ -249,7 +268,111 @@ def save_flow_reply(db: Session, message: Dict[str, Any], store: Store) -> List[
         rows.append(row)
     db.commit()
     logger.info("Saved WhatsApp review for %s (%s stars, %s photos)", order.order_number, rating, len(photos))
+    # the form promises the discount for adding a photo, whatever the rating; reward the upload
+    # even if one of our downloads failed, since the customer did their part
+    if uploads and REWARD_PERCENT > 0:
+        send_reward(db, order)
+    else:
+        send_thanks(db, order)
     return rows
+
+
+# ---------------------------------------------------------------- photo reward
+def create_reward_coupon(db: Session) -> models.Coupon:
+    """A fresh single-use % coupon with no expiry date."""
+    while True:
+        code = "THANKS" + "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
+        if not db.query(models.Coupon).filter(models.Coupon.code == code).first():
+            break
+    coupon = models.Coupon(
+        code=code, discount_type="percent", discount_percent=REWARD_PERCENT, max_uses=1,
+        is_active=True, ends_at=None,
+    )
+    db.add(coupon)
+    db.flush()
+    return coupon
+
+
+def _first_name(customer_name: str) -> str:
+    parts = (customer_name or "").split()
+    return parts[0] if parts else "there"
+
+
+def reward_text(customer_name: str, code: str) -> str:
+    return (
+        f"Thanks for your review and photos, {_first_name(customer_name)}! 🙌\n\n"
+        f"Here's {REWARD_PERCENT:g}% off your next Loopstitch order: *{code}*\n"
+        "Use it at checkout on loopstitch.online. It can be used once."
+    )
+
+
+def thanks_text(customer_name: str) -> str:
+    return (
+        f"Thanks for your review, {_first_name(customer_name)}! 🙌\n"
+        "Your feedback helps us make better tees. See you at the next drop – loopstitch.online"
+    )
+
+
+def send_thanks(db: Session, order: models.Order) -> models.Notification:
+    """Thank-you text for a review without photos; logged under Notifications."""
+    notification = models.Notification(
+        order_id=order.id,
+        order_number=order.order_number,
+        customer_name=order.customer_name,
+        customer_phone=whatsapp_helper.to_e164(order.customer_phone),
+        message_type=THANKS_MESSAGE_TYPE,
+        status="pending",
+    )
+    db.add(notification)
+    db.flush()
+    try:
+        result = whatsapp_helper.send_text_message(notification.customer_phone, thanks_text(order.customer_name))
+        notification.whatsapp_message_id = result.get("message_id", "")
+        notification.status = "sent"
+        notification.sent_at = _utcnow()
+    except Exception as exc:
+        notification.status = "failed"
+        notification.error_message = str(exc)[:500]
+        logger.warning("Review thank-you WhatsApp failed for %s: %s", order.order_number, exc)
+    db.commit()
+    return notification
+
+
+def send_reward(db: Session, order: models.Order) -> models.Notification:
+    """Create the coupon and WhatsApp it; logged under Notifications so a failed send shows up."""
+    coupon = create_reward_coupon(db)
+    notification = models.Notification(
+        order_id=order.id,
+        order_number=order.order_number,
+        customer_name=order.customer_name,
+        customer_phone=whatsapp_helper.to_e164(order.customer_phone),
+        message_type=REWARD_MESSAGE_TYPE,
+        status="pending",
+        error_message=f"Coupon {coupon.code}",
+    )
+    db.add(notification)
+    db.commit()  # keep the coupon even if the message fails; the admin can see the code
+    deliver_reward(notification, order, coupon.code)
+    db.commit()
+    return notification
+
+
+def reward_code(notification: models.Notification) -> str:
+    """The coupon code recorded on a reward notification ("Coupon THANKS…")."""
+    match = re.search(r"Coupon (THANKS[A-Z0-9]+)", notification.error_message or "")
+    return match.group(1) if match else ""
+
+
+def deliver_reward(notification: models.Notification, order: models.Order, code: str) -> None:
+    try:
+        result = whatsapp_helper.send_text_message(notification.customer_phone, reward_text(order.customer_name, code))
+        notification.whatsapp_message_id = result.get("message_id", "")
+        notification.status = "sent"
+        notification.sent_at = _utcnow()
+    except Exception as exc:
+        notification.status = "failed"
+        notification.error_message = f"Coupon {code}: {exc}"[:500]
+        logger.warning("Review reward WhatsApp failed for %s: %s", order.order_number, exc)
 
 
 def handle_flow_reply(message: Dict[str, Any], store: Store) -> None:

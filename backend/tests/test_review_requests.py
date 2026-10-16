@@ -44,6 +44,19 @@ def sent(monkeypatch):
     return calls
 
 
+@pytest.fixture(autouse=True)
+def texts(monkeypatch):
+    """Plain WhatsApp texts (the reward coupon) instead of calling Meta."""
+    calls = []
+
+    def fake_text(phone, text):
+        calls.append({"phone": phone, "text": text})
+        return {"message_id": f"wamid.TEXT{len(calls)}"}
+
+    monkeypatch.setattr(whatsapp_helper, "send_text_message", fake_text)
+    return calls
+
+
 @pytest.fixture
 def stored(monkeypatch):
     """Photos the webhook saves, instead of writing to cloud storage / disk."""
@@ -63,10 +76,12 @@ def png_bytes(size=(40, 30)):
     return buf.getvalue()
 
 
-def flow_reply(order_id, phone="919876543210", rating="5", feedback="Great fit!", photos=None, token=None):
+def flow_reply(order_id, phone="919876543210", rating="5", feedback="Great fit!", photos=None, token=None, documents=None):
     answers = {"flow_token": token or review_requests.flow_token(order_id), "rating": rating, "feedback": feedback}
     if photos is not None:
         answers["photos"] = photos
+    if documents is not None:
+        answers["documents"] = documents
     return {"entry": [{"changes": [{"value": {"messages": [{
         "from": phone, "id": "wamid.IN1", "type": "interactive",
         "interactive": {"type": "nfm_reply", "nfm_reply": {"name": "flow", "body": "Sent", "response_json": json.dumps(answers)}},
@@ -153,11 +168,61 @@ def test_form_answers_become_review_with_photos(db, product, client, stored, adm
     assert "order_id" not in data["reviews"][0]
 
 
-def test_review_without_photos(db, product, client, stored):
+def test_review_without_photos_gets_thank_you_only(db, product, client, stored, texts):
     order_id = make_order(db, product)
     client.post("/api/webhooks/whatsapp", json=flow_reply(order_id, rating="4", feedback="", photos=[]))
     review = db.query(models.Review).one()
     assert review.rating == 4 and review.photos == []
+    assert db.query(models.Coupon).count() == 0
+    assert len(texts) == 1 and "Thanks for your review, Arjun" in texts[0]["text"]
+    assert db.query(models.Notification).filter_by(message_type="review_thanks").one().status == "sent"
+
+
+def test_photo_earns_single_use_20_percent_coupon(db, product, client, stored, texts, monkeypatch):
+    monkeypatch.setattr(whatsapp_helper, "download_media", lambda media_id: png_bytes())
+    order_id = make_order(db, product)
+    client.post("/api/webhooks/whatsapp", json=flow_reply(order_id, rating="2", photos=[{"id": "1"}]))
+
+    coupon = db.query(models.Coupon).one()
+    assert coupon.code.startswith("THANKS") and coupon.discount_percent == 20 and coupon.max_uses == 1
+    assert coupon.ends_at is None  # never expires
+    assert len(texts) == 1 and texts[0]["phone"] == "+919876543210"
+    assert coupon.code in texts[0]["text"] and "20% off" in texts[0]["text"]
+    n = db.query(models.Notification).filter_by(message_type="review_reward").one()
+    assert n.status == "sent" and review_requests.reward_code(n) == coupon.code
+
+    # Meta re-delivering the same answers must not hand out a second coupon
+    client.post("/api/webhooks/whatsapp", json=flow_reply(order_id, photos=[{"id": "1"}]))
+    assert db.query(models.Coupon).count() == 1 and len(texts) == 1
+
+
+def test_files_screen_documents_are_saved_and_rewarded(db, product, client, stored, texts, monkeypatch):
+    monkeypatch.setattr(whatsapp_helper, "download_media", lambda media_id: png_bytes())
+    order_id = make_order(db, product)
+    docs = [{"file_name": "tee.png", "mime_type": "image/png", "id": "9"}]
+    client.post("/api/webhooks/whatsapp", json=flow_reply(order_id, documents=docs))
+    review = db.query(models.Review).one()
+    assert len(review.photos) == 1
+    assert len(texts) == 1
+
+
+def test_failed_coupon_message_keeps_code_and_can_be_resent(db, product, client, stored, admin_token, monkeypatch):
+    monkeypatch.setattr(whatsapp_helper, "download_media", lambda media_id: png_bytes())
+
+    def boom(phone, text):
+        raise RuntimeError("outside 24h window")
+
+    monkeypatch.setattr(whatsapp_helper, "send_text_message", boom)
+    order_id = make_order(db, product)
+    client.post("/api/webhooks/whatsapp", json=flow_reply(order_id, photos=[{"id": "1"}]))
+    n = db.query(models.Notification).filter_by(message_type="review_reward").one()
+    code = db.query(models.Coupon).one().code
+    assert n.status == "failed" and code in n.error_message
+
+    monkeypatch.setattr(whatsapp_helper, "send_text_message", lambda phone, text: {"message_id": "wamid.T"})
+    monkeypatch.setattr(whatsapp_helper, "is_configured", lambda: True)
+    r = client.post(f"/api/admin/notifications/{n.id}/resend", headers={"Authorization": f"Bearer {admin_token}"})
+    assert r.status_code == 200 and r.json()["status"] == "sent" and code in r.json()["error_message"]
 
 
 def test_ignores_wrong_number_forged_token_and_duplicates(db, product, client, stored):
