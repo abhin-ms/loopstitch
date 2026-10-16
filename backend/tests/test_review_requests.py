@@ -339,3 +339,11 @@ def test_admin_test_endpoint_creates_dummy_order_and_full_flow_works(db, product
     assert db.query(models.Coupon).count() == 1 and len(texts) == 1
 
     assert client.post("/api/admin/review-requests/test", json={"phone": "916238860673"}).status_code == 401
+
+    # the dummy order stays out of every admin analytics view
+    stats = client.get("/api/admin/stats", headers=headers).json()
+    assert (stats["total_orders"], stats["unpaid_checkouts"], stats["revenue"]) == (0, 0, 0.0)
+    assert stats["visitors_total"] == 0 and stats["page_views_total"] == 0
+    assert client.get("/api/admin/carts", headers=headers).json()["counts"] == {"active": 0, "cleared": 0, "ordered": 0}
+    assert client.get("/api/admin/visitors", headers=headers).status_code == 200
+    assert all(c["orders"] == 0 for c in client.get("/api/admin/accounts", headers=headers).json()["customers"])
