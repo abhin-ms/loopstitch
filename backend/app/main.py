@@ -2685,6 +2685,41 @@ def admin_send_review_request(payload: schemas.ReviewRequestSend, db: Session = 
     return {"order_number": order.order_number, "phone": n.customer_phone, "status": n.status, "error": n.error_message or ""}
 
 
+@app.post("/api/admin/review-requests/test")
+def admin_test_review_request(payload: schemas.ReviewRequestTest, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
+    """Try the WhatsApp review form before there are real sales: creates a dummy order (TEST-…) on
+    this number for the first active product and sends the form now. The order is saved as
+    cancelled, so it never touches stock, revenue or shipping; delete it from Orders afterwards."""
+    if not whatsapp_helper.is_configured():
+        raise HTTPException(status_code=400, detail="WhatsApp is not configured")
+    digits = "".join(c for c in payload.phone if c.isdigit())
+    if len(digits) < 10:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    product = db.query(models.Product).filter(models.Product.is_active == True).order_by(models.Product.id).first()  # noqa: E712
+    if not product:
+        raise HTTPException(status_code=400, detail="Add at least one active product first")
+    order = models.Order(
+        order_number=f"TEST-{secrets.token_hex(3).upper()}",
+        customer_name=payload.name.strip() or "Test Customer",
+        customer_email="test@loopstitch.online",
+        customer_phone=whatsapp_helper.to_e164(digits),
+        shipping_address="Dummy order for testing the WhatsApp review form",
+        status=models.OrderStatus.cancelled,
+        subtotal=product.price,
+        total=product.price,
+        payment_method="online",
+    )
+    db.add(order)
+    db.flush()
+    db.add(models.OrderItem(order_id=order.id, product_id=product.id, product_name=product.name,
+                            size="M", quantity=1, unit_price=product.price))
+    db.commit()
+    n = review_requests.send_request(db, order)
+    logger.info("Admin %s sent a test review form (%s) to %s: %s", current.username, order.order_number, n.customer_phone, n.status)
+    return {"order_id": order.id, "order_number": order.order_number, "product": product.name,
+            "phone": n.customer_phone, "status": n.status, "error": n.error_message or ""}
+
+
 @app.patch("/api/admin/reviews/{review_id}/toggle", response_model=schemas.AdminReviewOut)
 def admin_toggle_review(review_id: int, db: Session = Depends(get_db), current: models.Admin = Depends(auth.get_current_admin)):
     review = db.query(models.Review).filter(models.Review.id == review_id).first()

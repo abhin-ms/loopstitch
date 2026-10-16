@@ -320,3 +320,22 @@ def test_admin_can_send_review_form_now_by_phone(db, product, client, admin_toke
 
     assert client.post("/api/admin/review-requests/send", json={"phone": "911111111111"}, headers=headers).status_code == 404
     assert client.post("/api/admin/review-requests/send", json={"phone": "919876543210"}).status_code == 401
+
+
+def test_admin_test_endpoint_creates_dummy_order_and_full_flow_works(db, product, client, admin_token, sent, stored, texts, monkeypatch):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    r = client.post("/api/admin/review-requests/test", json={"phone": "916238860673", "name": "Abhin"}, headers=headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "sent" and body["order_number"].startswith("TEST-") and body["phone"] == "+916238860673"
+    order = db.get(models.Order, body["order_id"])
+    assert order.status == models.OrderStatus.cancelled  # never counts as a sale
+    assert len(sent) == 1 and sent[0]["name"] == "Abhin"
+
+    # submitting the form on that number saves the review and sends the coupon
+    monkeypatch.setattr(whatsapp_helper, "download_media", lambda media_id: png_bytes())
+    client.post("/api/webhooks/whatsapp", json=flow_reply(order.id, phone="916238860673", photos=[{"id": "1"}]))
+    assert db.query(models.Review).filter_by(order_id=order.id).count() == 1
+    assert db.query(models.Coupon).count() == 1 and len(texts) == 1
+
+    assert client.post("/api/admin/review-requests/test", json={"phone": "916238860673"}).status_code == 401

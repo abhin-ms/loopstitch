@@ -220,6 +220,11 @@ class ReviewRequestSend(BaseModel):
     order_id: Optional[int] = None  # or for this exact order
 
 
+class ReviewRequestTest(BaseModel):
+    phone: str = Field(min_length=10, max_length=30)
+    name: str = Field(default="Test Customer", max_length=150)
+
+
 class IdList(BaseModel):
     ids: List[int] = Field(min_length=1, max_length=500)
 
